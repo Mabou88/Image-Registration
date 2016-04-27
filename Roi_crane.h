@@ -34,6 +34,7 @@ public:
  void zonegrise();
  //void modifiederriere();
  void sauvegardeimage();
+ ImageType::Pointer getcraneROI();
 
 
 private:

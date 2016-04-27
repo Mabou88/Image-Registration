@@ -11,6 +11,9 @@ Roi_crane::Roi_crane(ImageType::Pointer itkimageus ){
   
   
 }
+ImageType::Pointer Roi_crane::getcraneROI(){
+	return roi_crane;
+}
 
 void Roi_crane::sauvegardeimage(){
 	//sauvegarde l'image modifier
@@ -18,7 +21,7 @@ void Roi_crane::sauvegardeimage(){
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/roi_crane15.nii");
+  writer->SetFileName( "C:/im/roi_crane_P2V2_04.nii");
   writer->SetInput(roi_crane);
   writer->Update();
 
@@ -62,7 +65,7 @@ void Roi_crane::zonegrise(){
 	//en-dessous
 	for (int j=0;j<217;j++){
 		for (int i=0;i<180;i++){
-			for (int k=0;k<10;k++){
+			for (int k=0;k<55;k++){
 				itk::Index<3> curseur2={{i,j,k}};		
 				roi_crane->SetPixel(curseur2,0);
 			}
@@ -127,7 +130,7 @@ void Roi_crane::limiteposterieur(){
 	int limite_z[200];
 	int position=0;
 	
-	for (int z=20;z<125;z++){
+	for (int z=30;z<135;z++){
 
 	
 		
@@ -238,6 +241,9 @@ void Roi_crane::limitedroit(int z){
 		int trou=0;
 		int coord=0;
 
+		int patchdelete=0;
+		int compteurnoir=0;
+
 		for (int x=0;x<100;x++){
 			itk::Index<3> curseurread={{x,y,z}};
 			ImageType::PixelType pixelvalue;
@@ -257,6 +263,23 @@ void Roi_crane::limitedroit(int z){
 
 					
 														
+				}
+
+				//eliminer les rectangles d'intensité dans les coins
+				if (z<80){
+					if (pixelvalue>30){
+						patchdelete+=1;
+					}
+					if (patchdelete>10){
+						compteurnoir+=1;
+					}
+					if (compteurnoir>15){
+								//mettre à 0 les pixels extérieurs et ceux du crâne
+								for (int i=x;i>0;i--){
+									itk::Index<3> curseurwrite11={{i,y,z}};
+									roi_crane->SetPixel(curseurwrite11,0);
+								}
+					}
 				}
 				
 				//si la distance est de 5 au plus, c'est le crane
@@ -342,7 +365,7 @@ void Roi_crane::limitegauche(int z){
 	int limite_x_gauche[200];
 	int position=0;
 
-	for (int p=0;p<150;p++){
+	for (int p=0;p<200;p++){
 			//limite_x_droite[p]=0;
 			//limite_y[p]=0;
 		
@@ -357,6 +380,8 @@ void Roi_crane::limitegauche(int z){
 	    int trou_coor=0;
 		int trou=0;
 		int coord=0;
+		int patchdelete=0;
+		int compteurnoir=0;
 
 		for (int x=180;x>90;x--){
 			itk::Index<3> curseurread={{x,y,z}};
@@ -375,8 +400,23 @@ void Roi_crane::limitegauche(int z){
 					}
 					coord=x;
 
-					
-														
+																
+				}
+				//eliminer les rectangles d'intensité dans les coins
+				if (z<80){
+					if (pixelvalue>30){
+						patchdelete+=1;
+					}
+					if (patchdelete>10){
+						compteurnoir+=1;
+					}
+					if (compteurnoir>15){
+								//mettre à 0 les pixels extérieurs et ceux du crâne
+								for (int i=x;i<181;i++){
+									itk::Index<3> curseurwrite11={{i,y,z}};
+									roi_crane->SetPixel(curseurwrite11,0);
+								}
+					}
 				}
 				
 				//si la distance est de 5 au plus, c'est le crane
@@ -459,7 +499,7 @@ void Roi_crane::limitegauche(int z){
 void Roi_crane::limiteinferieuravant(){
 	
 	//on analyse avec une tranche coronal à la fois		
-	for (int j=145;j<200;j++){
+	for (int j=130;j<200;j++){
 
 		//variable pour une trache coronal
 		int limite_z[200];
@@ -629,7 +669,7 @@ void Roi_crane::limiteinferieuravant(){
 void Roi_crane::limiteinferieurarriere(){
 
 	//on analyse avec une tranche coronal à la fois	
-for (int j=90;j<145;j++){
+for (int j=75;j<130;j++){
 
 		//variable pour une trache coronal
 		int limite_z[200];
