@@ -35,7 +35,7 @@
 #include "itkCenteredTransformInitializer.h"
 
 
-typedef itk::Image<short,3> ImageType;
+typedef itk::Image<double,3> ImageType;
 
 void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkimageus);
 

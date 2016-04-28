@@ -5,7 +5,7 @@
 #include "mitkBaseGeometry.h"
 #include "mitkGeometry3D.h"
 
-typedef itk::Image<short,3> ImageType;
+typedef itk::Image<double,3> ImageType;
 typedef itk::Index<3> Index;
 
 #ifndef Matrice_H

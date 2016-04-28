@@ -8,8 +8,8 @@
 #include "itkImageIOBase.h"
 #include "itkNiftiImageIO.h"
 
-typedef itk::Image<short,3> ImageType;
-typedef itk::Index<3> Index;
+//typedef itk::Image<short,3> ImageType;
+//typedef itk::Index<3> Index;
 
 
 Matricelc2::Matricelc2(int nbrvoisins, Index index, mitk::BaseGeometry::Pointer geo_irm, mitk::BaseGeometry::Pointer geo_us, mitk::Image::Pointer image1,mitk::Image::Pointer image2,float facteurconversion,mitk::Image::Pointer mitkgradient)

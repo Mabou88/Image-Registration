@@ -1,6 +1,6 @@
 #include "AffineRegistration.h"
 
-typedef itk::Image<short,3> ImageType;
+//typedef itk::Image<double,3> ImageType;
 
 void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkimageus){
 
@@ -183,7 +183,7 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   resampler->SetDefaultPixelValue( 100 );
 
   //ecris le resultats dans un fichier results.nii
-   typedef  short  OutputPixelType;
+   typedef  double  OutputPixelType;
   typedef itk::Image< OutputPixelType,3> OutputImageType;
   typedef itk::CastImageFilter<ImageType, OutputImageType > CastFilterType;
   typedef itk::ImageFileWriter< OutputImageType >  WriterType;

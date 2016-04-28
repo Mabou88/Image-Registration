@@ -7,7 +7,7 @@
 #include <mitkImageToItk.h>
 #include <mitkITKImageImport.h>
 
-typedef itk::Image<short,3> ImageType;
+typedef itk::Image<double,3> ImageType;
 
 //mes fichiers
 #include "Matrice.h"

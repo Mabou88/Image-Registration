@@ -18,7 +18,7 @@
 
 using namespace std;
 
-typedef itk::Image<short,3> ImageType;
+typedef itk::Image<double,3> ImageType;
 typedef itk::ImageFileWriter<ImageType >  WriterType;
 
 class Limite_crane{
