@@ -21,10 +21,20 @@ void Roi_crane::sauvegardeimage(){
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/roi_crane_P2V2_04.nii");
+  writer->SetFileName( "C:/im/roi_crane_P2V2_17.nii");
   writer->SetInput(roi_crane);
   writer->Update();
 
+}
+
+void Roi_crane::setdim(){
+	ImageType::SizeType dimension=roi_crane->GetLargestPossibleRegion().GetSize();
+	dim_x=dimension[0];
+	dim_y=dimension[1];
+	dim_z=dimension[2];
+	cout<< dim_x<<endl;
+	cout<< dim_y<<endl;
+	cout<< dim_z<<endl;
 }
 
 int Roi_crane::max(int a,int b){
@@ -151,7 +161,7 @@ void Roi_crane::limiteposterieur(){
 
 			//on rencontre le crâne
 				if (pixelvalue>160){
-					
+					//compteur de l'epaisseur du crane
 					epaisseur+=1;
 					//verifier que les pixels du crane sont collé
 					if (epaisseur>1){
@@ -217,6 +227,151 @@ void Roi_crane::limiteposterieur(){
 }
 
 
+
+void Roi_crane::limitedroit(int z){
+	
+		
+	//variable pour une trache axiale
+	int limite_y[200];
+	int limite_x_droite[200];
+	int position=0;
+
+	
+	for (int y=limitepost_value;y<200;y++){
+		//Analyse la partie droite
+		
+		//variable pour une tranche coronale
+		
+		//int estdansimage=0;
+		//int noirceur=0;
+		bool limite=false;
+		int epaisseur_droite=0;
+		
+	    int trou_coor=0;
+		int trou=0;
+		int coord=0;
+
+		int patchdelete=0;
+		int compteurnoir=0;
+
+		for (int x=0;x<90;x++){
+			itk::Index<3> curseurread={{x,y,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			//on rencontre le crâne
+				if (pixelvalue>150){
+					//compteur de l'epaisseur du crane			
+					epaisseur_droite+=1;
+					//verifier que les pixels du crane sont collé
+					if (epaisseur_droite>1){
+						if (x-coord>1){
+							epaisseur_droite=0;
+						}
+					}
+					coord=x;
+
+					
+														
+				}
+
+				//eliminer les rectangles d'intensité dans les coins (zone d'intensité entre les zones noires)
+				if (z<90 && x<70){
+					if (pixelvalue>10){
+						patchdelete+=1;
+					}
+					if (patchdelete>9 && pixelvalue==0){
+						compteurnoir+=1;
+					}
+					if (compteurnoir>10){
+								//mettre à 0 les pixels extérieurs et ceux du crâne
+								for (int i=x;i>0;i--){
+									itk::Index<3> curseurwrited1={{i,y,z}};
+									roi_crane->SetPixel(curseurwrited1,0);
+								}
+								//reset
+								compteurnoir=0;
+								patchdelete=0;
+								break;
+					}
+				}
+				
+				//si la distance est de 5 au plus, c'est le crane
+				if (epaisseur_droite>3){
+					limite=true;
+				}
+				
+				//lorsqu'on sort de l'épaisseur du crane
+				if (limite==true && pixelvalue<141){
+					
+					
+					//dependamment si cest la première limite de la slice
+					if (position!=0){
+
+						int différence_y=y-limite_y[position-1];
+						int différence_x=x-limite_x_droite[position-1];
+						//verifie que les limites sont collées
+						if (différence_x<10 && différence_y<10){
+							limite_x_droite[position]=x;
+							limite_y[position]=y;
+
+							//mettre à 0 les pixels extérieurs et ceux du crâne
+							for (int i=x;i>0;i--){
+								itk::Index<3> curseurwrite1={{i,y,z}};
+								roi_crane->SetPixel(curseurwrite1,0);
+							}
+							position+=1;
+							
+						}
+						break;
+					//si cest la première limite de la slice
+					}else{
+						limite_x_droite[position]=x;
+						limite_y[position]=y;
+						
+						//mettre à 0 les pixels extérieurs et ceux du crâne
+						for (int j=y;j>0;j--){
+							for (int i=x;i>0;i--){
+								itk::Index<3> curseurwrite2={{i,j,z}};
+								roi_crane->SetPixel(curseurwrite2,0);
+							}
+						}
+						position+=1;
+						break;
+
+					}
+					
+									
+											
+									     				 
+				
+				}
+			
+		}
+		
+	}
+	//reevalue toutes les lignes mises a zero
+	for (int i=0;i<199;i++){
+		int difference=limite_y[i+1]-limite_y[i];
+		//s'il y a des trous entre les lignes noires
+		if (difference>1){
+			for (int j=limite_y[i]+1;j<limite_y[i+1];j++){
+				//x est le milieu de deux lignes a 0 a ajuster!!!!!
+				int x=(limite_x_droite[i]+limite_x_droite[i+1])/2;
+				//on va les remplir de 0 (noire) aussi
+				for (int i=x;i>0;i--){
+							itk::Index<3> curseurwrite2={{i,j,z}};
+							roi_crane->SetPixel(curseurwrite2,0);
+				}
+
+			}
+		}
+
+
+	}
+
+}
+/*
 
 void Roi_crane::limitedroit(int z){
 	
@@ -357,6 +512,150 @@ void Roi_crane::limitedroit(int z){
 	}
 
 }
+*/
+void Roi_crane::limitegauche(int z){
+	
+		
+	//variable pour une trache axiale
+	int limite_y[200];
+	int limite_x_gauche[200];
+	int position=0;
+
+	for (int p=0;p<200;p++){
+			//limite_x_droite[p]=0;
+			//limite_y[p]=0;
+		
+
+	}
+	for (int y=limitepost_value;y<155;y++){
+		//Analyse la partie droite
+		
+		//variable pour une tranche coronale
+		bool limite=false;
+		int epaisseur=0;
+	    int trou_coor=0;
+		int trou=0;
+		int coord=0;
+		int patchdelete=0;
+		int compteurnoir=0;
+
+		for (int x=180;x>90;x--){
+			itk::Index<3> curseurread={{x,y,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			//on rencontre le crâne
+				if (pixelvalue>140){
+					//compteur de l'epaisseur du crane					
+					epaisseur+=1;
+					//verifier que les pixels du crane sont collé
+					if (epaisseur>1){
+						if (x-coord>1){
+							epaisseur=0;
+						}
+					}
+					coord=x;
+
+																
+				}
+				//eliminer les rectangles d'intensité dans les coins (zone d'intensité entre les zones noires)
+				if (z<90 && x>110){
+					if (pixelvalue>10){
+						patchdelete+=1;
+					}
+					if (patchdelete>9 && pixelvalue==0){
+						compteurnoir+=1;
+					}
+					if (compteurnoir>10){
+								//mettre à 0 les pixels extérieurs et ceux du crâne
+								for (int i=x;i<181;i++){
+									itk::Index<3> curseurwriteg1={{i,y,z}};
+									roi_crane->SetPixel(curseurwriteg1,0);
+								}
+								//reset
+								compteurnoir=0;
+								patchdelete=0;
+								break;
+					}
+				}
+				
+				//si la distance est de 5 au plus, c'est le crane
+				if (epaisseur>2){
+					limite=true;
+				}
+				
+				//lorsqu'on sort de l'épaisseur du crane
+				if (limite==true && pixelvalue<141){
+					
+					
+					//dependamment si cest la première limite de la slice
+					if (position!=0){
+
+						int différence_y=y-limite_y[position-1];
+						int différence_x=limite_x_gauche[position-1]-x;
+						//verifie que les limites sont collées
+						if (différence_x<10 && différence_y<10){
+							limite_x_gauche[position]=x;
+							limite_y[position]=y;
+
+							//mettre à 0 les pixels extérieurs et ceux du crâne
+							for (int i=x;i<181;i++){
+								itk::Index<3> curseurwrite1={{i,y,z}};
+								roi_crane->SetPixel(curseurwrite1,0);
+							}
+							position+=1;
+							
+						}
+						break;
+					//si cest la première limite de la slice
+					}else{
+						limite_x_gauche[position]=x;
+						limite_y[position]=y;
+						
+						//mettre à 0 les pixels extérieurs et ceux du crâne
+						for (int j=y;j>0;j--){
+							for (int i=x;i<181;i++){
+								itk::Index<3> curseurwrite2={{i,j,z}};
+								roi_crane->SetPixel(curseurwrite2,0);
+							}
+						}
+						position+=1;
+						break;
+
+					}
+					
+									
+											
+									     				 
+				
+				}
+			
+		}
+		
+	}	
+
+	//bouche les trous
+	for (int i=0;i<199;i++){
+		int difference=limite_y[i+1]-limite_y[i];
+		//s'il y a des trous entre les lignes noires
+		if (difference>1){
+			for (int j=limite_y[i]+1;j<limite_y[i+1];j++){
+				//x est le milieu de deux lignes a 0 a ajuster!!!!!
+				int x=(limite_x_gauche[i]+limite_x_gauche[i+1])/2;
+				//on va les remplir de 0 (noire) aussi
+				for (int i=x;i<181;i++){
+							itk::Index<3> curseurwrite2={{i,j,z}};
+							roi_crane->SetPixel(curseurwrite2,0);
+				}
+
+			}
+		}
+
+
+	}
+
+}
+/*
 void Roi_crane::limitegauche(int z){
 	
 		
@@ -496,6 +795,7 @@ void Roi_crane::limitegauche(int z){
 
 }
 
+*/
 void Roi_crane::limiteinferieuravant(){
 	
 	//on analyse avec une tranche coronal à la fois		
@@ -528,7 +828,7 @@ void Roi_crane::limiteinferieuravant(){
 					pixelvalue=roi_crane->GetPixel(curseurread);
 
 					//on rencontre le crâne (130 aussi....?)
-						if (pixelvalue>125){
+						if (pixelvalue>180){
 						
 							epaisseur+=1;
 							//verifier que les pixels du crane sont collé
@@ -545,7 +845,7 @@ void Roi_crane::limiteinferieuravant(){
 					
 						//verifier qu'il n'y a pas de baisse d'intensité dans le crane
 							if (epaisseur>0 && limite==false){
-								if (pixelvalue<125){
+								if (pixelvalue<150){
 									epaisseur=0;
 									
 								}
@@ -558,7 +858,7 @@ void Roi_crane::limiteinferieuravant(){
 						}
 				
 						//lorsqu'on sort de l'épaisseur du crane
-						if (limite==true && pixelvalue<126){
+						if (limite==true){
 					
 						
 									//dependamment si cest la première limite de la slice

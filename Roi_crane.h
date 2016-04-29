@@ -36,11 +36,17 @@ public:
  void sauvegardeimage();
  ImageType::Pointer getcraneROI();
 
+ void setdim();
+ 
+
 
 private:
 	ImageType::Pointer roi_crane;
 	int limitepost_value;
 	int max(int,int);
+	int dim_x;
+	int dim_y;
+	int dim_z;
 	//bool limite;
 	//int epaisseur;
 	//int coord;
