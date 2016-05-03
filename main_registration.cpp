@@ -317,31 +317,7 @@ int main(int argc, const char * argv[]) {
 
     
     
-	 /*******************
-     *Mettre la meme matrice worldindex pour US et IRM
-     ******************/
-	/*
-	mitk::Image::Pointer mitkImageUS = mitk::ImportItkImage(image_US);
-	mitk::Image::Pointer mitkImageIRM = mitk::ImportItkImage(image_IRM);
-	mitk::BaseGeometry::Pointer geometryIRM = mitkImageIRM->GetGeometry();
-	mitk::BaseGeometry::Pointer geometryUS = mitkImageUS->GetGeometry();
-	geometryUS->SetIndexToWorldTransform(geometryIRM->GetIndexToWorldTransform());
-	mitkImageUS->SetGeometry(geometryIRM);
 	
-	//convertit mitk to itk(attention, le type des images doit être le même)
-	mitk::ImageToItk<ImageType>::Pointer toItkFilter =mitk::ImageToItk<ImageType>::New();
-    toItkFilter->SetInput(mitkImageUS);
-    toItkFilter->Update();
-    ImageType::Pointer itkImageUS = toItkFilter->GetOutput();
-
-	WriterType::Pointer   writer1 =  WriterType::New();
-    itk::NiftiImageIO::Pointer ioimagenifti1=itk::NiftiImageIO::New();
-
-    writer1->SetImageIO(ioimagenifti1);
-    writer1->SetFileName( "C:/im/US_index.nii");
-    writer1->SetInput(itkImageUS);
-    writer1->Update();
-	*/
 	//*************************************************************************
   // Registration
   //*************************************************************************
@@ -350,41 +326,41 @@ int main(int argc, const char * argv[]) {
     /*******************
      * DOWNSAMPLING US
      ******************/
- //   //RESOLUTION ADAPTATION US
- //   ShrinkFilterType::Pointer shrinkFilter = ShrinkFilterType::New();
- //   shrinkFilter->SetInput(image_US);
- //   
- //   //recuperation des spacing des deux images pour savoir quel facteur utiliser
- //   ImageType::SpacingType spacingUS = image_US->GetSpacing();
- //   ImageType::SpacingType spacingIRM = image_IRM->GetSpacing();
- //  
-	////calcul du spacing factor
- //   //int shrinkX = int(spacingIRM[0]/spacingUS[0]);
- //   //int shrinkY = int(spacingIRM[1]/spacingUS[1]);
- //   //int shrinkZ = int(spacingIRM[2]/spacingUS[2]);
+    //RESOLUTION ADAPTATION US
+    ShrinkFilterType::Pointer shrinkFilter = ShrinkFilterType::New();
+    shrinkFilter->SetInput(image_US);
+    
+    //recuperation des spacing des deux images pour savoir quel facteur utiliser
+    ImageType::SpacingType spacingUS = image_US->GetSpacing();
+    ImageType::SpacingType spacingIRM = image_IRM->GetSpacing();
+   
+	//calcul du spacing factor
+    //int shrinkX = int(spacingIRM[0]/spacingUS[0]);
+    //int shrinkY = int(spacingIRM[1]/spacingUS[1]);
+    //int shrinkZ = int(spacingIRM[2]/spacingUS[2]);
 
-	//int shrinkX = 1;
- //   int shrinkY = 1;
- //   int shrinkZ = 1;
- //   
- //   cout<<"shrinking factors : "<<shrinkX<<", "<<shrinkY<<", "<<shrinkZ<<endl;
+	int shrinkX = 1;
+    int shrinkY = 1;
+    int shrinkZ = 1;
+    
+    cout<<"shrinking factors : "<<shrinkX<<", "<<shrinkY<<", "<<shrinkZ<<endl;
 
- //   //porc 6 : (3,3,2)/ porc 1 (5,4,3)
- //   shrinkFilter->SetShrinkFactor(0, shrinkX);
- //   shrinkFilter->SetShrinkFactor(1, shrinkY);
- //   shrinkFilter->SetShrinkFactor(2, shrinkZ);
- //   try {
- //       shrinkFilter->Update();
- //   } catch (itk::ExceptionObject &e) {
- //       cerr<<"error while downsampling US image"<<endl;
- //       cerr<<e<<endl;
- //       return EXIT_FAILURE;
- //   }
-	//
-	////image_US->SetSpacing(spacingIRM);
- //   
- ////  ImageType::Pointer US_shrunk = shrinkFilter->GetOutput();
-	ImageType::Pointer US_shrunk =image_US;
+    //porc 6 : (3,3,2)/ porc 1 (5,4,3)
+    shrinkFilter->SetShrinkFactor(0, shrinkX);
+    shrinkFilter->SetShrinkFactor(1, shrinkY);
+    shrinkFilter->SetShrinkFactor(2, shrinkZ);
+    try {
+        shrinkFilter->Update();
+    } catch (itk::ExceptionObject &e) {
+        cerr<<"error while downsampling US image"<<endl;
+        cerr<<e<<endl;
+        return EXIT_FAILURE;
+    }
+	
+	
+    
+   ImageType::Pointer US_shrunk = shrinkFilter->GetOutput();
+	// ImageType::Pointer US_shrunk =image_US;
 //        //verification ecriture de l'image
 //            WriterType::Pointer writer6 = WriterType::New();
 //            string out6 = outputPath+"/ShrunkUS.nii.gz";
@@ -472,20 +448,16 @@ int main(int argc, const char * argv[]) {
 //Test
 //************************************************************************* 
 	
-	//*************************************************************************	
-
-//Fait une translation de l'image IRM
-//************************************************************************* 
 	
-	//index décaler
 
 
     //*************************************************************************
   // Selectionne la region of interest du crane avec le gradient
   //*************************************************************************
-	/*
+	
 	Roi_crane crane(US_shrunk);
-
+	
+	crane.setdim();
 	crane.limiteinferieuravant();
 	crane.limiteinferieurarriere();
 	crane.limiteposterieur();
@@ -495,16 +467,18 @@ int main(int argc, const char * argv[]) {
 		crane.limitegauche(z);
 		
 	}
+	cout<<"bordure"<<endl;
 	crane.bordureexterieur();
+	cout<<"zone"<<endl;
 	crane.zonegrise();
 	
 
 	crane.sauvegardeimage();
 	ImageType::Pointer US_final=crane.getcraneROI();
-	//US_shrunk=US_final;
+	US_shrunk=US_final;
 	cout<<"region selectionné"<<endl;
 	cout<<"region selectionné"<<endl;
-	*/
+	
 	//*************************************************************************	
 
 //sauvegarde l'image modifier
