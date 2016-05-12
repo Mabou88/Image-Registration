@@ -300,7 +300,7 @@ public:
         std::cout<<" start index region accessible : "<<startIndex<<std::endl;
         std::cout<<"taille region accessible : "<<accessibleImagePart.GetSize()<<std::endl;
         
-		std::cout<<"yoooooo"<<std::endl;
+		
         
         //TEST IMAGE ITERATOR RATHER THAN NITERATOR
         //CONST IT CAUSE WE DONT MODIFY IMAGE INTENSITIES
@@ -327,20 +327,21 @@ public:
 		//size of neighbourhood
         int m = 343;
         
-		std::cout<<"0.01"<<std::endl;
+		
         //interpolateur pour image IRM et gradient
         LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
         interpolator->SetInputImage(m_FixedImage);
-        std::cout<<"0.1"<<std::endl;
+        
         LinearInterpolatorFilterType::Pointer gradInterpolator = LinearInterpolatorFilterType::New();
         gradInterpolator->SetInputImage(m_grad);
         
         //compute the number of patches for which the MTM matrix is singular
         int counter_det_null =0;
         
-		std::cout<<"1"<<std::endl;
+		int position=0;
         while(!US_it.IsAtEnd())
         {
+			
             //        //cout<<"US index under consideration : "<<US_it.GetIndex()<<endl;
             //        //on ne considere le voisinage que si le centre appartient à la region blanche du mask et s'il est a l'int de l'im IRM accessible
                     ImageType::PointType p;
@@ -525,8 +526,9 @@ public:
                             
                         }
                         
-                        
-                        //cout<<"lc2 locale : "<<lc2<<endl;
+                        position+=1;
+                        cout<<"lc2 locale : "<<lc2<<endl;
+						cout<<position<<endl;
                         
                         //ajout pondere par variance pour calcul de la LC2 totale
                         lc2varsum2 = lc2varsum2 + (lc2*variance);
@@ -561,7 +563,7 @@ public:
                 {
                     //cout<<"neighbourhood in real US data"<<endl;
                     // new neighborhood at each loop iteration
-                    cout<<"3"<<endl;
+                    
                     //indice pour remplir les matrices
                     int indice = 0;
                     
@@ -606,7 +608,7 @@ public:
                     it.GoToBegin();
                     
                     //parcours du voisinnage;
-                    cout<<"4"<<endl;
+                    
                     //NEIGHBORHOOD ITERATION
                     while (!it.IsAtEnd())
                     {
@@ -655,7 +657,7 @@ public:
                         indice++;
                         ++it;
                     }
-                    cout<<"5"<<endl;
+                    
                     mean = mean/m;
                     //cout<<"moyenne : "<<mean<<endl;
                     
@@ -717,6 +719,7 @@ public:
                         {
                             lc2 = 1 - (sum/(m*variance));
                             //lc2 = sum/(m*variance); //for minimisation test
+							
                             
                         }
                         else

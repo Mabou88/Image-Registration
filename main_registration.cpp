@@ -467,7 +467,9 @@ int main(int argc, const char * argv[]) {
 		crane.limitegauche(z);
 		
 	}
+	cout<<"bordure"<<endl;
 	crane.bordureexterieur();
+	cout<<"zone"<<endl;
 	crane.zonegrise();
 	
 
