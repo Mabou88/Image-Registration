@@ -205,10 +205,13 @@ ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &para
         ImageType::PointType origin = m_MovingImage->GetOrigin();
         ImageType::SpacingType spacing = m_MovingImage->GetSpacing();
         ImageType::PointType center;
-        center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
-        center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
-        center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
-        
+       // center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
+        //center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
+        //center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+        center[0] =0;
+        center[1] =0;
+        center[2] =0;
+		cout<<"center of rotation"<<center<<endl;
         
         EulerTransformType::ParametersType eulerFixedParameters(3);
         eulerFixedParameters[0] =center[0];
@@ -267,9 +270,12 @@ MaskType::Pointer LC2_function::TransformMask(const dlib::matrix<double> &params
         ImageType::PointType origin = m_MovingImage->GetOrigin();
         ImageType::SpacingType spacing = m_MovingImage->GetSpacing();
         ImageType::PointType center;
-        center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
-        center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
-        center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+        //center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
+        //center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
+        //center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+		center[0] =0;
+        center[1] =0;
+        center[2] =0;
         
         
         EulerTransformType::ParametersType eulerFixedParameters(3);

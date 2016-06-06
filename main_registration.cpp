@@ -15,8 +15,7 @@
 #include "Roi_crane.h"
 #include "AffineRegistration.h"
 
-#include "mitkITKImageImport.h"
-#include "mitkImageToItk.h"
+
 
 #include "itkImage.h"
 #include "itkImageFileReader.h"
@@ -86,6 +85,7 @@ typedef itk::LC2ImageToImageMetric<ImageType, ImageType> LC2MetricType;
 typedef itk::TranslationTransform<double,3> TranslationType;
 typedef itk::AffineTransform<double,3> AffineTransformType;
 typedef itk::BSplineTransform<double,3,3> BSplineTransformType;
+typedef BSplineTransformType::ParametersType     BSParametersType;
 typedef itk::AdaptiveHistogramEqualizationImageFilter<ImageType> HistoEqualizerType;
 
 
@@ -456,7 +456,7 @@ int main(int argc, const char * argv[]) {
   //*************************************************************************
 	
 	Roi_crane crane(US_shrunk);
-	
+	/*
 	crane.setdim();
 	crane.limiteinferieuravant();
 	crane.limiteinferieurarriere();
@@ -467,18 +467,56 @@ int main(int argc, const char * argv[]) {
 		crane.limitegauche(z);
 		
 	}
-	cout<<"bordure"<<endl;
+	
 	crane.bordureexterieur();
-	cout<<"zone"<<endl;
+	
 	crane.zonegrise();
+
+	//crane.patchertrou();
+	*/
+	//*************************************************************************
+  // technique avec le masque
+  //*************************************************************************
+	
+	ImageType::Pointer mask_US = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io = itk::NiftiImageIO::New();
+    reader_m->SetImageIO(mask_io);
+    reader_m->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/02-05_mask_rot.nii");
+    try {
+        reader_m->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading US mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    mask_US = reader_m->GetOutput();
+	crane.maskcrane(mask_US);
+	
 	
 
 	crane.sauvegardeimage();
 	ImageType::Pointer US_final=crane.getcraneROI();
+	
 	US_shrunk=US_final;
 	cout<<"region selectionné"<<endl;
 	cout<<"region selectionné"<<endl;
 	
+	
+	
+	//*************************************************************************
+  // Calcul de volume
+  //*************************************************************************
+	Roi_crane volumeirm(rescaled_IRM);
+	volumeirm.maskcrane(mask_US);
+	volumeirm.setdim();
+	volumeirm.calculvolumecrane();
+
+
+
 	//*************************************************************************	
 
 //sauvegarde l'image modifier
@@ -487,7 +525,7 @@ int main(int argc, const char * argv[]) {
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/US_shrunk.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/US_shrunk.nii");
   writer->SetInput(US_shrunk);
   writer->Update();
 
@@ -495,7 +533,7 @@ int main(int argc, const char * argv[]) {
   itk::NiftiImageIO::Pointer ioimagenifti2=itk::NiftiImageIO::New();
 
   writer2->SetImageIO(ioimagenifti2);
-  writer2->SetFileName( "C:/im/rescaled_IRM.nii");
+  writer2->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/rescaled_IRM.nii");
   writer2->SetInput(rescaled_IRM);
   writer2->Update();
 
@@ -591,13 +629,13 @@ int main(int argc, const char * argv[]) {
     LC2_function LC2 = LC2_function(rescaled_IRM,US_shrunk,outputPath);//MRI_shrunk or rescaled
     //make sure that the mask is computed on US_Shrunk but that we use the rescaled image to compute LC2
     //LC2.setMovingImage(rescaled_US);
-    LC2.setMaxRot(0.3); //0.3 for best initialisation
-    LC2.setMaxTrans(10);//10
+    LC2.setMaxRot(0.2); //0.3 for best initialisation
+    LC2.setMaxTrans(7);//10
     LC2.setRadius(radius);
     
     if(useLiverMask) LC2.setLiverMask(LiverMask);
     
-   double best_score = find_max_bobyqa(LC2, initialParameters, m, x_lower, x_upper, LC2.getRadius(), precision, nombreIteration);
+   double best_score = find_min_bobyqa(LC2, initialParameters, m, x_lower, x_upper, LC2.getRadius(), precision, nombreIteration);
     //double best_score = find_min_bobyqa(LC2_function(rescaled_IRM, US_shrunk), initialParameters, m, x_lower, x_upper, radius, precision, nombreIteration);
     
     cout<<"best score 1ere etape : "<<best_score<<endl;
@@ -633,7 +671,7 @@ int main(int argc, const char * argv[]) {
     
     //ecritire des parametres dans un fichier txt
     
-    string outP =outputPath+"/parameters.txt";
+    string outP =outputPath+"parameters.txt";
     ofstream fichier(outP.c_str(),ios::out | ios::trunc );
     
     if(fichier)
@@ -656,9 +694,12 @@ int main(int argc, const char * argv[]) {
     ImageType::PointType origin2 = US_shrunk->GetOrigin();
     ImageType::SpacingType spacing2 = US_shrunk->GetSpacing();
     ImageType::PointType center2;
-    center2[0] = origin2[0]+spacing2[0]*sizeUS2[0]/2;
-    center2[1] = origin2[1]+spacing2[1]*sizeUS2[1]/2;
-    center2[2] = origin2[2]+spacing2[2]*sizeUS2[2]/2;
+    //center2[0] = origin2[0]+spacing2[0]*sizeUS2[0]/2;
+    //center2[1] = origin2[1]+spacing2[1]*sizeUS2[1]/2;
+    //center2[2] = origin2[2]+spacing2[2]*sizeUS2[2]/2;
+	center2[0] = 0;
+    center2[1] = 0;
+    center2[2] = 0;
     
     
     EulerTransformType::ParametersType eulerFixedParameters2(3);
@@ -687,7 +728,7 @@ int main(int argc, const char * argv[]) {
     cout<<"writing final result"<<endl;
     
     WriterType::Pointer writer8 = WriterType::New();
-    string out8 =outputPath+"\finalregistreredUSBOBYQA.nii.gz";
+    string out8 =outputPath+"finalregistreredUSBOBYQA.nii.gz";
     writer8->SetImageIO(io);
     writer8->SetInput(finalImage);
     writer8->SetFileName(out8);
@@ -978,12 +1019,43 @@ int main(int argc, const char * argv[]) {
     /***********************
      * TEST TSF DEFORMABLE
      **********************/
-    /*
+    
     BSplineTransformType::Pointer Btransform = BSplineTransformType::New();
+    //space dimension est a 3
+	//spline order est a 3 (peut le changer les 2)
+    int SpaceDimension=3;
+	int SplineOrder=3;
+
+	unsigned int numberOfGridNodesInOneDimension = 7;
+	BSplineTransformType::PhysicalDimensionsType   fixedPhysicalDimensions;
+  BSplineTransformType::MeshSizeType             meshSize;
+  BSplineTransformType::OriginType               fixedOrigin;
+
+  for( unsigned int i=0; i< SpaceDimension; i++ )
+    {
+    fixedOrigin[i] = rescaled_IRM->GetOrigin()[i];
+    fixedPhysicalDimensions[i] = rescaled_IRM->GetSpacing()[i] * static_cast<double>(rescaled_IRM->GetLargestPossibleRegion().GetSize()[i] - 1 );
+    }
+  meshSize.Fill( numberOfGridNodesInOneDimension - SplineOrder );
+	
+	
+  Btransform->SetTransformDomainOrigin( fixedOrigin );
+  Btransform->SetTransformDomainPhysicalDimensions(
+    fixedPhysicalDimensions );
+  Btransform->SetTransformDomainMeshSize( meshSize );
+  Btransform->SetTransformDomainDirection(rescaled_IRM->GetDirection() );
+  
+  const unsigned int numberOfParameters = Btransform->GetNumberOfParameters();
+  cout<<"number of parametre B SPline"<<numberOfParameters<<endl;
+  BSParametersType parameters( numberOfParameters );
+  parameters.Fill( 0.0 );
+  
+  //definition de la region de deformation
     
-    //definition de la region de deformation
+
+
+
     
-    */
     
     
     

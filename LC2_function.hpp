@@ -38,7 +38,7 @@
 //DLIB ELEMENTS
 //#include <matrix.h>
 
-#include <matrix.h>
+#include <dlib\matrix.h>
 
 using namespace dlib;
 using namespace std;
@@ -128,13 +128,13 @@ public:
         MaskType::Pointer movedMask = TransformMask(params, 1);
         
         
-        //downsampling de l'image US
+        //downsampling de l'image US //changer 1 /2
         
         ShrinkFilterType::Pointer shrinkFilter = ShrinkFilterType::New();
         shrinkFilter->SetInput(movedImage);
-        shrinkFilter->SetShrinkFactor(0,2);//2
-        shrinkFilter->SetShrinkFactor(1,2);
-        shrinkFilter->SetShrinkFactor(2,2);
+        shrinkFilter->SetShrinkFactor(0,1);//2
+        shrinkFilter->SetShrinkFactor(1,1);
+        shrinkFilter->SetShrinkFactor(2,1);
         try {
             shrinkFilter->Update();
         } catch (itk::ExceptionObject &e) {
@@ -151,9 +151,9 @@ public:
         
         BinaryShrinkFilterType::Pointer binaryShrink = BinaryShrinkFilterType::New();
         binaryShrink->SetInput(movedMask);
-        binaryShrink->SetShrinkFactor(0, 2);
-        binaryShrink->SetShrinkFactor(1, 2);
-        binaryShrink->SetShrinkFactor(2, 2);
+        binaryShrink->SetShrinkFactor(0, 1);
+        binaryShrink->SetShrinkFactor(1, 1);
+        binaryShrink->SetShrinkFactor(2, 1);
         try {
             binaryShrink->Update();
         } catch (itk::ExceptionObject &e) {
@@ -173,12 +173,26 @@ public:
         long indMaxZ =0;
         long indMinZ = 100000;
         
-        //iterateur pour le mask
+        
+		std::cout<<"verification image size before cropping : "<<mask_shrunk->GetLargestPossibleRegion().GetSize()<<std::endl;
+        
+		
+		WriterType::Pointer   writer =  WriterType::New();
+		 itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
+
+		 writer->SetImageIO(ioimagenifti);
+		writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/movingimageT.nii");
+		writer->SetInput(movingImageT);
+		 writer->Update();
+
+		//iterateur pour le mask
         
         BinaryImageIteratorType mask_it(mask_shrunk,mask_shrunk->GetLargestPossibleRegion());
         mask_it.GoToBegin();
+		int iterateurparcours=0;
         while(!mask_it.IsAtEnd())
         {
+			iterateurparcours+=1;
             if(mask_it.Get()>0)
             {
                 MaskType::IndexType ind = mask_it.GetIndex();
@@ -220,7 +234,8 @@ public:
             ++mask_it;
             
         }
-        
+        std::cout<<"parcours iterateur"<<iterateurparcours<<std::endl;
+
         std::cout<<"indices minimum X,Y,Z "<<std::endl;
         std::cout<<"X : "<<indMinX<<" "<<indMaxX<<std::endl;
         std::cout<<"Y : "<<indMinY<<" "<<indMaxY<<std::endl;
@@ -286,21 +301,45 @@ public:
         //on itere sur toute l'image accessible -> celle pour laquelle le neighboorhood it ne va pas sortir de l'image
         ImageType::RegionType accessibleImagePart;
         ImageType::RegionType::IndexType startIndex = moving_Cropped->GetLargestPossibleRegion().GetIndex();
-        startIndex[0] =startIndex[0]+3;
-        startIndex[1] =startIndex[1]+3;
-        startIndex[2] =startIndex[2]+3;
+       //startIndex[0] =startIndex[0]+3;
+        //startIndex[1] =startIndex[1]+3;
+       //startIndex[2] =startIndex[2]+3;
+	    startIndex[0] =startIndex[0]+23;
+        startIndex[1] =startIndex[1]+35;
+        startIndex[2] =startIndex[2]+42;
+
+		//to select center with ventricule
+		// startIndex[0] =startIndex[0]+6;
+        //startIndex[1] =startIndex[1]+8;
+        //startIndex[2] =startIndex[2]+10;
         ImageType::RegionType::SizeType sizeAccessible;
         ImageType::SizeType sizeIm = moving_Cropped->GetLargestPossibleRegion().GetSize();
-        sizeAccessible[0] = sizeIm[0]-6;
-        sizeAccessible[1] = sizeIm[1]-6;
-        sizeAccessible[2] = sizeIm[2]-6;
+        //sizeAccessible[0] = sizeIm[0]-6;
+        //sizeAccessible[1] = sizeIm[1]-6;
+       // sizeAccessible[2] = sizeIm[2]-6;
+
+	    sizeAccessible[0] = sizeIm[0]-60;
+        sizeAccessible[1] = sizeIm[1]-70;
+        sizeAccessible[2] = sizeIm[2]-74;
+
+		//to select center with ventricule
+		//sizeAccessible[0] = 10;
+        //sizeAccessible[1] = 20;
+        //sizeAccessible[2] = 10;
         
         accessibleImagePart.SetIndex(startIndex);
         accessibleImagePart.SetSize(sizeAccessible);
+		//accessibleImagePart.SetSize(sizeIm);
         std::cout<<" start index region accessible : "<<startIndex<<std::endl;
         std::cout<<"taille region accessible : "<<accessibleImagePart.GetSize()<<std::endl;
         
-		std::cout<<"yoooooo"<<std::endl;
+		WriterType::Pointer   writer2 =  WriterType::New();
+		 itk::NiftiImageIO::Pointer ioimagenifti2=itk::NiftiImageIO::New();
+
+		 writer2->SetImageIO(ioimagenifti2);
+		 writer2->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/croppingmovingimageT.nii");
+		// writer2->SetInput(accessibleImagePart);
+		 //writer2->Update();
         
         //TEST IMAGE ITERATOR RATHER THAN NITERATOR
         //CONST IT CAUSE WE DONT MODIFY IMAGE INTENSITIES
@@ -311,6 +350,7 @@ public:
         /////////////////////////
         //to iterate over the accessible part of m_FixedImage
         ImageConstIteratorType US_it(movingImageT,accessibleImagePart);
+		// ImageConstIteratorType US_it(movingImageT,);
         US_it.GoToBegin();
         
         
@@ -327,20 +367,21 @@ public:
 		//size of neighbourhood
         int m = 343;
         
-		std::cout<<"0.01"<<std::endl;
+		
         //interpolateur pour image IRM et gradient
         LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
         interpolator->SetInputImage(m_FixedImage);
-        std::cout<<"0.1"<<std::endl;
+        
         LinearInterpolatorFilterType::Pointer gradInterpolator = LinearInterpolatorFilterType::New();
         gradInterpolator->SetInputImage(m_grad);
         
         //compute the number of patches for which the MTM matrix is singular
         int counter_det_null =0;
         
-		std::cout<<"1"<<std::endl;
+		int position=0;
         while(!US_it.IsAtEnd())
         {
+			
             //        //cout<<"US index under consideration : "<<US_it.GetIndex()<<endl;
             //        //on ne considere le voisinage que si le centre appartient à la region blanche du mask et s'il est a l'int de l'im IRM accessible
                     ImageType::PointType p;
@@ -357,8 +398,12 @@ public:
                 m_LiverMask->TransformPhysicalPointToIndex(p, i);
                 
                 //we consider the neighbourhood only if it's center is in the actual US data and inside the liver mask
-                if(int(mask_shrunk->GetPixel(US_it.GetIndex()))==255 && int(m_LiverMask->GetPixel(i))==1)// && m_accessibleMRI->TransformPhysicalPointToIndex(p, i))
-                {
+				
+				//problème car on ne pénalise pas si l'exterieur du crane du US est sur l'interieur du crane de l'IRM
+               
+				//if(int(mask_shrunk->GetPixel(US_it.GetIndex()))==255 && int(m_LiverMask->GetPixel(i))==1)// && m_accessibleMRI->TransformPhysicalPointToIndex(p, i))
+               // {
+
                     //cout<<"neighbourhood in real IRM mask data"<<endl;
                     // new neighborhood at each loop iteration
                     
@@ -432,10 +477,20 @@ public:
                             //                        M(indice,0) = m_FixedImage->GetPixel(indexIRM);
                             //
                             //                        M(indice,1) = m_grad->GetPixel(indexIRM);
+
+							//si l'iterateur est dans le masque
+							if(m_LiverMask->GetPixel(indexIRM)==1){
                             
                             //test with linear interpolator
                             M(indice,0) = interpolator->Evaluate(pt);
                             M(indice,1) = gradInterpolator->Evaluate(pt);
+							}
+							//sinon la valeur est nulle
+							else
+							{
+								M(indice,0)=0;
+								M(indice,1)=0;
+							}
                             
                         }
                         
@@ -512,46 +567,93 @@ public:
                         double lc2;
                         if(variance != 0)
                         {
-                            lc2 = 1 - (sum/(m*variance));
-                            //lc2 = sum/(m*variance); //for minimisation test
+                           // lc2 = 1 - (sum/(m*variance));
+                            lc2 = sum/(m*variance); //for minimisation test
                             
                         }
                         else
                         {
-                            std::cout<<"variance on patch is null"<<std::endl;
+                            //std::cout<<"variance on patch is null"<<std::endl;
                             //cout<<"neighbourhood voxel center : "<<p<<endl;
-                            std::cout<<U<<std::endl;
+                            //std::cout<<U<<std::endl;
                             lc2 = 0;
                             
                         }
                         
-                        
+                       // position+=1;
                         //cout<<"lc2 locale : "<<lc2<<endl;
+						//cout<<position<<endl;
                         
                         //ajout pondere par variance pour calcul de la LC2 totale
                         lc2varsum2 = lc2varsum2 + (lc2*variance);
                         
                         
                     } catch (itk::ExceptionObject &e) {
-                        std::cerr<<"Matrix det is null"<<std::endl;
-                        std::cerr<<e<<std::endl;
+						//cela veut dire que la matrice M IRM est juste avec des 0 pour les intensités
+                       // std::cerr<<"Matrix det is null"<<std::endl;
+                      //  std::cerr<<e<<std::endl;
                         counter_det_null++;
-                        // cerr<<"spatial position of center of neighbourhood"<<p<<endl;
+                       //  cerr<<"spatial position of center of neighbourhood"<<p<<endl;
                         //std::cerr<<"matric M"<<M<<std::endl;
                         //std::cerr<<"metrice MTM"<<MTM<<std::endl;
-                        //ici c'est pcq ce sont des patchs unifomrme qu'il y a erreur ?
-                        //param[0] = 1 ;
-                        //param[1] = 0;
-                        //param[2] = 0;
                         
                         
+						//si US est juste des 0 alors il ne compte pas car variance =0
+						PType param;
+						//ceci est donc pour IRM 0 mais pas US, on souhaite eviter cette situation, LC2 penalisé combien?
+						//trouver la bonne valeur de gamma pour ajuster
+						param[0] = 0;
+                        param[1] = 0;
+                        param[2] = mean;
+
+						 it.GoToBegin();
+                        //cout<<"calcul de la variance pour patch"<<endl;
+                        while (!it.IsAtEnd()) {
+                            variance = variance + ((it.Get()- mean)*(it.Get() - mean));
+                            ++it;
+                        }
+                        
+                        variance = variance/m;
+                        //cout<<"Variance : "<<variance<<endl;
+                        //add to sum of variance for weighted average at the end to get global lc2
+                        variancesum2+= variance;
+
+						double sum=0;
+
+						for (int j = 0; j<m;j++)
+                        {
+                            sum = sum +  ((U[j] - (param[0]*M(j,0) + param[1]*M(j,1) + param[2]))*(U[j] - (param[0]*M(j,0) + param[1]*M(j,1) + param[2])));
+                        }
+                        double lc2;
+                        if(variance != 0)
+                        {
+                           // lc2 = 1 - (sum/(m*variance));
+                          //  lc2 = sum/(m*variance); //for minimisation test
+							lc2=1.5; //si IRM 0 et pas US alors lc2=3> moyenne de 1 et cest penalise si US est nul alors variance =0 et lc2=0
+                            
+                        }
+                        else
+                        {
+                           // std::cout<<"variance on patch is null"<<std::endl;
+                            //cout<<"neighbourhood voxel center : "<<p<<endl;
+                            //std::cout<<U<<std::endl;
+                            lc2 = 0;
+                            
+                        }
+                       // cout<<"lc2"<<lc2<<endl;
+                       // position+=1;
+                        //cout<<"lc2 locale : "<<lc2<<endl;
+						//cout<<position<<endl;
+                        
+                        //ajout pondere par variance pour calcul de la LC2 totale
+                        lc2varsum2 = lc2varsum2 + (lc2*variance);
                     }
                     
                     
                     
                     
                     
-                }
+               // }
             }
             
             else
@@ -561,7 +663,7 @@ public:
                 {
                     //cout<<"neighbourhood in real US data"<<endl;
                     // new neighborhood at each loop iteration
-                    cout<<"3"<<endl;
+                    
                     //indice pour remplir les matrices
                     int indice = 0;
                     
@@ -606,7 +708,7 @@ public:
                     it.GoToBegin();
                     
                     //parcours du voisinnage;
-                    cout<<"4"<<endl;
+                    
                     //NEIGHBORHOOD ITERATION
                     while (!it.IsAtEnd())
                     {
@@ -655,7 +757,7 @@ public:
                         indice++;
                         ++it;
                     }
-                    cout<<"5"<<endl;
+                    
                     mean = mean/m;
                     //cout<<"moyenne : "<<mean<<endl;
                     
@@ -683,6 +785,9 @@ public:
                         //                cout<<U<<endl;
                         //calcul de la LCI sur ce patch
                         param = MTM*M.GetTranspose()*U;
+
+
+
                         //STD DEV COMPUTATION
                         //calcul de la variance sur ce patch
                         
@@ -717,6 +822,7 @@ public:
                         {
                             lc2 = 1 - (sum/(m*variance));
                             //lc2 = sum/(m*variance); //for minimisation test
+							
                             
                         }
                         else
@@ -742,7 +848,7 @@ public:
                         cerr<<"spatial position of center of neighbourhood"<<p<<endl;
                         std::cerr<<"matric M"<<M<<std::endl;
                         //std::cerr<<"metrice MTM"<<MTM<<std::endl;
-                        //ici c'est pcq ce sont des patchs unifomrme qu'il y a erreur ?
+                         
                         //param[0] = 1 ;
                         //param[1] = 0;
                         //param[2] = 0;
