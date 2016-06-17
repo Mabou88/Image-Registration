@@ -21,7 +21,7 @@ void Roi_crane::sauvegardeimage(){
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/roi_crane_P2V2_12.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/roi_crane_P2V2_4.nii");
   writer->SetInput(roi_crane);
   writer->Update();
 
@@ -97,17 +97,162 @@ void Roi_crane::zonegrise(){
 			}
 		}
 	}
-	/*
-	//derriere
+	//posterieur
 	for (int j=0;j<40;j++){
-		for (int i=0;i<180;i++){
+		for (int i=0;i<181;i++){
 			for (int k=0;k<181;k++){
 				itk::Index<3> curseur2={{i,j,k}};		
 				roi_crane->SetPixel(curseur2,0);
 			}
 		}
 	}
-	*/
+	//anterieur
+	for (int j=200;j<217;j++){
+		for (int i=0;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	//gauche droite
+	for (int j=0;j<217;j++){
+		for (int i=0;i<30;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	for (int j=0;j<217;j++){
+		for (int i=160;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+
+}
+
+
+void Roi_crane::maskcrane(ImageType::Pointer mask_us){
+	
+/*
+ typedef itk::ImageConstIterator<ImageType> iterator;
+ iterator it_m(mask_us,mask_us->GetBufferedRegion);
+
+ it_m.GoToBegin();
+
+ while(!it_m.IsAtEnd()){
+    //on recupere le point dans l'espace correspondant pour aller le chercher dans l'IRM
+     ImageType::IndexType index_m = it_m.GetIndex();
+	 ImageType::PixelType pixelvalue_m;
+	 pixelvalue_m=mask_us->GetPixel(index_m);
+	 ImageType::PointType pt;
+                     
+     mask_us->TransformIndexToPhysicalPoint(index_m, pt);
+	
+	 ImageType::IndexType index_us;
+	 roi_crane->TransformPhysicalPointToIndex(pt,index_us);
+	  ImageType::PixelType pixelvalue_us;
+	  pixelvalue_us=roi_crane->GetPixel(index_us);
+
+	if (pixelvalue_m==1){
+		roi_crane->SetPixel(index_us,0);
+	}
+	
+
+	
+	
+ }
+ */
+	//si le masque superpose la partie on la garde l'image US sinon on l'élimine
+	typedef itk::LinearInterpolateImageFunction<ImageType> LinearInterpolatorFilterType;
+	LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
+     interpolator->SetInputImage(mask_us);
+	 
+	ImageType::SizeType dimension=roi_crane->GetLargestPossibleRegion().GetSize();
+	for (int i=0;i<dimension[0];i++){
+		for (int j=0;j<dimension[1];j++){
+			for (int k=0;k<dimension[2];k++){
+				ImageType::IndexType index_us ={{i,j,k}};
+				 ImageType::PointType pt;
+                     
+				 roi_crane->TransformIndexToPhysicalPoint(index_us, pt);
+	
+				 
+				  ImageType::PixelType pixelvalue_m;
+				  ImageType::IndexType index_m;
+				  if(mask_us->TransformPhysicalPointToIndex(pt,index_m)){
+				  
+				  
+						  pixelvalue_m=mask_us->GetPixel(index_m);
+						  //pixelvalue_m=interpolator->Evaluate(pt);
+
+						if (pixelvalue_m!=1){
+							roi_crane->SetPixel(index_us,0);
+						}
+				  }else{
+					  roi_crane->SetPixel(index_us,0);
+				  }
+			}
+		}
+	}
+
+}
+
+
+void Roi_crane::calculvolumecrane(){
+	int min_x=dim_x;
+	int max_x=0;
+	int min_y=dim_y;
+	int max_y=0;
+	int min_z=dim_z;
+	int max_z=0;
+	
+	//min max en x y et z
+	
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{i,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					if (i>max_x)
+						max_x=i;
+					if (i<min_x)
+						min_x=i;
+					if (j>max_y)
+						max_y=j;
+					if (j<min_y)
+						min_y=j;
+					if (k>max_z)
+						max_z=k;
+					if (k<min_z)
+						min_z=k;
+					
+				}
+
+				
+			}
+		}
+	}
+	
+	cout<<"limite x"<<min_x<<max_x<<endl;
+	cout<<"limite y"<<min_y<<max_y<<endl;
+	cout<<"limite x"<<min_z<<max_z<<endl;
+
+	int a=(max_x-min_x)/2;
+	int b=(max_y-min_y)/2;
+	int c=(max_z-min_z)/2;
+
+	double fraction=1.333333;
+	double pi=3.14159265359;
+	double volume=fraction*pi*a*b*c;
+	
+	cout<<"volume"<<volume<<endl;
+
 
 }
 //elimine les reflets de l'ultrason
@@ -614,11 +759,11 @@ void Roi_crane::limitegauche(int z){
 					limite=true;
 				}
 				if (x==107 && y==161 && z==136){
-					cout<<"epaisseur"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				if (x==108 && y==121 && z==136){
-					cout<<"epaisseur milieu"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				//lorsqu'on sort de l'épaisseur du crane

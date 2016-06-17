@@ -1,6 +1,6 @@
 #ifndef AFFINEREGISTRATION_H    // To make sure you don't declare the function more than once by including the header multiple times.
 #define AFFINEREGISTRATION_H
-#include "mitkImage.h"
+
 
 //fichier itk
 #include "itkimage.h"
@@ -8,8 +8,7 @@
 #include "itkImageIOBase.h"
 #include "itkNiftiImageIO.h"
 #include "itkNrrdImageIO.h"
-#include <mitkImageToItk.h>
-#include <mitkITKImageImport.h>
+
 
 //fichier registration
 #include "itkAmoebaOptimizer.h"
@@ -34,6 +33,7 @@
 #include "itkAffineTransform.h"
 #include "itkCenteredTransformInitializer.h"
 
+using namespace std;
 
 typedef itk::Image<double,3> ImageType;
 
