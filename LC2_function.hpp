@@ -185,7 +185,7 @@ public:
 		writer001->SetInput(movedMask);
 		 writer001->Update();
         
-        //downsampling de l'image US //changer 1 /2
+        //downsampling de l'image US //changer 1 /2 //shrink sur IRM sert a rien en ce moment
         
         ShrinkFilterType::Pointer shrinkFilter = ShrinkFilterType::New();
         shrinkFilter->SetInput(movedImage);
@@ -325,11 +325,11 @@ public:
         
         ExtractorType::Pointer CroppingFilter = ExtractorType::New();
         CroppingFilter->SetExtractionRegion(regionCropped);
-        CroppingFilter->SetInput(movingImageT);
+        CroppingFilter->SetInput(m_FixedImage);
         CroppingFilter->SetDirectionCollapseToIdentity();
         CroppingFilter->Update();
-        ImageType::Pointer moving_Cropped = CroppingFilter->GetOutput();
-        std::cout<<"verification image size : "<<moving_Cropped->GetLargestPossibleRegion().GetSize()<<std::endl;
+        ImageType::Pointer US_Cropped = CroppingFilter->GetOutput();
+        std::cout<<"verification image size : "<<US_Cropped->GetLargestPossibleRegion().GetSize()<<std::endl;
         
         //        //writing to verify
         //        typename WriterType::Pointer writer4 = WriterType::New();
@@ -357,30 +357,31 @@ public:
         std::cout<<"defining accessible region of image"<<std::endl;
         //on itere sur toute l'image accessible -> celle pour laquelle le neighboorhood it ne va pas sortir de l'image
         ImageType::RegionType accessibleImagePart;
-        ImageType::RegionType::IndexType startIndex = moving_Cropped->GetLargestPossibleRegion().GetIndex();
-      // startIndex[0] =startIndex[0]+3;
-       // startIndex[1] =startIndex[1]+3;
-      // startIndex[2] =startIndex[2]+3;
+        ImageType::RegionType::IndexType startIndex = US_Cropped->GetLargestPossibleRegion().GetIndex();
+       //startIndex[0] =startIndex[0]+3;
+        //startIndex[1] =startIndex[1]+3;
+       //startIndex[2] =startIndex[2]+3;
 	   
 		//centre du cerveau
-		startIndex[0] =startIndex[0]+23;
+		startIndex[0] =startIndex[0]+30;
        startIndex[1] =startIndex[1]+35;
-        startIndex[2] =startIndex[2]+42;
+        startIndex[2] =startIndex[2]+35;
 
 		//to select center with ventricule
 		// startIndex[0] =startIndex[0]+6;
         //startIndex[1] =startIndex[1]+8;
         //startIndex[2] =startIndex[2]+10;
         ImageType::RegionType::SizeType sizeAccessible;
-        ImageType::SizeType sizeIm = moving_Cropped->GetLargestPossibleRegion().GetSize();
-       //sizeAccessible[0] = sizeIm[0]-6;
+        ImageType::SizeType sizeIm = US_Cropped->GetLargestPossibleRegion().GetSize();
+
+      // sizeAccessible[0] = sizeIm[0]-6;
         //sizeAccessible[1] = sizeIm[1]-6;
        //sizeAccessible[2] = sizeIm[2]-6;
 
 		//to select center with ventricule
 	    sizeAccessible[0] = sizeIm[0]-60;
-        sizeAccessible[1] = sizeIm[1]-70;
-        sizeAccessible[2] = sizeIm[2]-74;
+        sizeAccessible[1] = sizeIm[1]-60;
+        sizeAccessible[2] = sizeIm[2]-65;
 
 		//to select center with ventricule
 		//sizeAccessible[0] = 10;
@@ -409,7 +410,7 @@ public:
         // ITERATIONS OVER IMAGE /
         /////////////////////////
         //to iterate over the accessible part of m_FixedImage
-        ImageConstIteratorType US_it(movingImageT,accessibleImagePart);
+        ImageConstIteratorType US_it(m_FixedImage,accessibleImagePart);
 		// ImageConstIteratorType US_it(movingImageT,);
         US_it.GoToBegin();
         
@@ -430,7 +431,7 @@ public:
 		
         //interpolateur pour image IRM et gradient
         LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
-        interpolator->SetInputImage(m_FixedImage);
+        interpolator->SetInputImage(movingImageT);
         
         LinearInterpolatorFilterType::Pointer gradInterpolator = LinearInterpolatorFilterType::New();
         gradInterpolator->SetInputImage(m_grad);
@@ -446,7 +447,7 @@ public:
             //        //on ne considere le voisinage que si le centre appartient à la region blanche du mask et s'il est a l'int de l'im IRM accessible
                     ImageType::PointType p;
                     //get the equivalent in physical point to evaluate whether it's within the MRI image
-                    movingImageT->TransformIndexToPhysicalPoint(US_it.GetIndex(),p);
+                    m_FixedImage->TransformIndexToPhysicalPoint(US_it.GetIndex(),p);
 					
                     //cout<<"Physical space coordinates of center of neighbourhood : "<<p<<endl;
                     //typename ImageType::IndexType i;
@@ -493,9 +494,9 @@ public:
                     //le debut de la region = le premier indice du masque
                     start = US_it.GetIndex();
                     //le vrai debut est 3 pixel plus haut, plus a gauche et plus en profondeur
-                    start[0]= start[0]-3;
-                    start[1]= start[1]-3;
-                    start[2]= start[2]-3;
+                   // start[0]= start[0]-3;
+                    //start[1]= start[1]-3;
+                    //start[2]= start[2]-3;
                     
                     //7-by-7 cube
                     ImageType::RegionType::SizeType sizeN;
@@ -506,7 +507,7 @@ public:
                     neighbourhood.SetIndex(start);
                     neighbourhood.SetSize(sizeN);
                     
-                    ImageConstIteratorType it(movingImageT,neighbourhood);
+                    ImageConstIteratorType it(m_FixedImage,neighbourhood);
                     
                     it.GoToBegin();
                     
@@ -526,20 +527,20 @@ public:
                         ImageType::IndexType indexUS = it.GetIndex();
                         ImageType::PointType pt;
                         
-                        movingImageT->TransformIndexToPhysicalPoint(indexUS, pt);
+                        m_FixedImage->TransformIndexToPhysicalPoint(indexUS, pt);
                         //pt now contains the position in physica space of the considered voxel
                         
                         ImageType::IndexType indexIRM;
                         
                         //si le point est dans l'image IRM
-                        if(m_FixedImage->TransformPhysicalPointToIndex(pt, indexIRM))
+                        if(movingImageT->TransformPhysicalPointToIndex(pt, indexIRM))
                         {
                             //                        M(indice,0) = m_FixedImage->GetPixel(indexIRM);
                             //
                             //                        M(indice,1) = m_grad->GetPixel(indexIRM);
 
 							//si l'iterateur est dans le masque
-							if(m_LiverMask->GetPixel(indexIRM)==1){
+							if(movedMask->GetPixel(indexIRM)==255){
                             
                             //test with linear interpolator
                             M(indice,0) = interpolator->Evaluate(pt);
@@ -657,7 +658,21 @@ public:
                         //std::cerr<<"matric M"<<M<<std::endl;
                         //std::cerr<<"metrice MTM"<<MTM<<std::endl;
                         
-                        
+						
+						int nonzero=0;
+                        for (int a=0;a<343;a++){
+							if (M(a,0)!=0){
+								nonzero++;
+
+							}
+
+
+						}
+						if (nonzero>340){
+							cout<<"Matrice non nul  mais det=0"<<endl;
+							 cerr<<"spatial position of center of neighbourhood"<<p<<endl;
+						}
+
 						//si US est juste des 0 alors il ne compte pas car variance =0
 						PType param;
 						//ceci est donc pour IRM 0 mais pas US, on souhaite eviter cette situation, LC2 penalisé combien?
@@ -763,7 +778,7 @@ public:
                     neighbourhood.SetIndex(start);
                     neighbourhood.SetSize(sizeN);
                     
-                    ImageConstIteratorType it(movingImageT,neighbourhood);
+                    ImageConstIteratorType it(m_FixedImage,neighbourhood);
                     
                     it.GoToBegin();
                     
@@ -783,7 +798,7 @@ public:
                         ImageType::IndexType indexUS = it.GetIndex();
                         ImageType::PointType pt;
                         
-                        movingImageT->TransformIndexToPhysicalPoint(indexUS, pt);
+                        m_FixedImage->TransformIndexToPhysicalPoint(indexUS, pt);
                         //pt now contains the position in physica space of the considered voxel
                         
 
@@ -792,7 +807,7 @@ public:
                         
 
                         //si le point est dans l'image IRM
-                        if(m_FixedImage->TransformPhysicalPointToIndex(pt, indexIRM))
+                        if(movingImageT->TransformPhysicalPointToIndex(pt, indexIRM))
                         {
                             //                        M(indice,0) = m_FixedImage->GetPixel(indexIRM);
                             //

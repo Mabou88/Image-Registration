@@ -87,10 +87,11 @@ typedef itk::AffineTransform<double,3> AffineTransformType;
 typedef itk::BSplineTransform<double,3,3> BSplineTransformType;
 typedef BSplineTransformType::ParametersType     BSParametersType;
 typedef itk::AdaptiveHistogramEqualizationImageFilter<ImageType> HistoEqualizerType;
-
+typedef itk::TranslationTransform<double,3> TranslationTransformType;
 
 //pour le mapping de l'image mobile registree ac tsf determinee par registration framework
 typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleFilterType;
+typedef itk::ResampleImageFilter<MaskType, MaskType> ResamplerBinaryType;
 
 //pour la mise a l'echelle de la bande passante des intensites
 typedef itk::RescaleIntensityImageFilter<ImageType,ImageType> RescaleFilterType;
@@ -444,11 +445,115 @@ int main(int argc, const char * argv[]) {
     minMaxIRM2->Compute();
 
     cout<<"rescaled intensity range IRM image : "<<"[ "<<minMaxIRM2->GetMinimum()<<","<<minMaxIRM2->GetMaximum()<<" ]"<<endl;
- //*************************************************************************	
-//Test
+ 
+//*************************************************************************	
+//Align image center
 //************************************************************************* 
 	
+	//trouve les centres
+	ImageType::SizeType size_irm=rescaled_IRM->GetLargestPossibleRegion().GetSize();
+	ImageType::SizeType size_us=US_shrunk->GetLargestPossibleRegion().GetSize();
+	ImageType::IndexType centre_irm;
+	centre_irm[0]=size_irm[0]/2;
+	centre_irm[1]=size_irm[1]/2;
+	centre_irm[2]=size_irm[2]/2;
+	ImageType::IndexType centre_us;
+	centre_us[0]=size_us[0]/2;
+	centre_us[1]=size_us[1]/2;
+	centre_us[2]=size_us[2]/2;
+
+	ImageType::PointType centre_spatial_irm;
+	rescaled_IRM->TransformIndexToPhysicalPoint(centre_irm,centre_spatial_irm);
+	ImageType::PointType centre_spatial_us;
+	US_shrunk->TransformIndexToPhysicalPoint(centre_us,centre_spatial_us);
+
+	cout<<"us centre"<<centre_spatial_us<<endl;
+	cout<<"irm centre"<<centre_spatial_irm<<endl;
+	//calcul les parametres de translation
+	EulerTransformType::Pointer translation =  EulerTransformType::New();
+	EulerTransformType::ParametersType parametre(6);
+	parametre[0]=0;
+	parametre[1]=0;
+	parametre[2]=0;
+	parametre[3] = centre_spatial_us[0]-centre_spatial_irm[0];
+	parametre[4] = centre_spatial_us[1]-centre_spatial_irm[1];
+	parametre[5] = centre_spatial_us[2]-centre_spatial_irm[2];
+	parametre[3]=parametre[3]*-1;
+	parametre[4]=parametre[4]*-1;
+	parametre[5]=parametre[5]*-1;
+	translation->SetParameters(parametre);
+	cout<< "parametre"<<parametre<<endl;
+  
+	//transformation
+	ResampleFilterType::Pointer resampleFilter = ResampleFilterType::New();
+	resampleFilter->SetTransform(translation);
+	resampleFilter->SetInput(rescaled_IRM);
+	ImageType::SizeType   size = rescaled_IRM->GetLargestPossibleRegion().GetSize();
+	resampleFilter->SetSize( size );
+	resampleFilter->SetOutputSpacing(rescaled_IRM->GetSpacing());
+	resampleFilter->SetOutputDirection(translation->GetInverseMatrix()*rescaled_IRM->GetDirection());
+	resampleFilter->SetOutputOrigin(translation->GetInverseTransform()->TransformPoint(rescaled_IRM->GetOrigin()));
+	resampleFilter->Update();
+
+	ResamplerBinaryType::Pointer resampleFilter2 = ResamplerBinaryType::New();
+	resampleFilter2->SetTransform(translation);
+	resampleFilter2->SetInput(LiverMask);
+	ImageType::SizeType   sizemask = LiverMask->GetLargestPossibleRegion().GetSize();
+	resampleFilter2->SetSize( sizemask );
+	resampleFilter2->SetOutputSpacing(LiverMask->GetSpacing());
+	resampleFilter2->SetOutputDirection(translation->GetInverseMatrix()*LiverMask->GetDirection());
+	resampleFilter2->SetOutputOrigin(translation->GetInverseTransform()->TransformPoint(LiverMask->GetOrigin()));
+	resampleFilter2->Update();
+
+
+//*************************************************************************	
+//resize
+//************************************************************************* 
+	/*
+	ResampleFilterType::Pointer resampler1 = ResampleFilterType::New();
+    resampler1->SetInput(US_shrunk);
 	
+	ImageType::SizeType sizeirm=rescaled_IRM->GetLargestPossibleRegion().GetSize();
+	ImageType::SizeType sizeus=US_shrunk->GetLargestPossibleRegion().GetSize();
+	ImageType::SpacingType spacingirm=rescaled_IRM->GetSpacing();
+	ImageType::SpacingType spacingus=US_shrunk->GetSpacing();
+	
+	resampler1->SetSize(rescaled_IRM->GetLargestPossibleRegion().GetSize());
+
+	ImageType::SpacingType nouveauspacing;
+	nouveauspacing[2]=(sizeus[1]*spacingUS[1])/sizeirm[2];
+	nouveauspacing[1]=(sizeus[0]*spacingUS[0])/sizeirm[1];
+	nouveauspacing[0]=(sizeus[2]*spacingUS[2])/sizeirm[0];
+    resampler1->SetOutputSpacing(spacingIRM);
+   resampler1->SetOutputDirection(rescaled_IRM->GetDirection());
+   resampler1->SetOutputOrigin(rescaled_IRM->GetOrigin());
+
+	
+    //est ce que c'est une bonne idee de garder l'image full res alors qu'on fait le recalage base sur l'us downsampled ?
+    try {
+            resampler1->Update();
+        } catch (itk::ExceptionObject &e) {
+            cerr<<"error while transforming mesh"<<endl;
+            cerr<<e<<endl;
+    }
+	*/
+	//ImageType::Pointer sizeImage = ImageType::New();
+    //sizeImage = resampleFilter->GetOutput();
+
+	MaskType::Pointer sizeImage = MaskType::New();
+    sizeImage = resampleFilter2->GetOutput();
+
+	BinaryWriterType::Pointer   writer0 =  BinaryWriterType::New();
+		itk::NiftiImageIO::Pointer ioimagenifti0=itk::NiftiImageIO::New();
+
+		 string outputfile="C:/Users/Marc-Antoine/Documents/Imagecode/output/sizeimage.nii";
+		
+
+		 writer0->SetImageIO(ioimagenifti0);
+		writer0->SetFileName( outputfile);
+		writer0->SetInput(sizeImage);
+		 writer0->Update();
+
 
 
     //*************************************************************************
@@ -504,6 +609,34 @@ int main(int argc, const char * argv[]) {
 	
 	US_shrunk=US_final;
 	cout<<"region selectionné"<<endl;
+
+
+
+	Roi_crane crane2(rescaled_IRM);
+
+	ImageType::Pointer mask_IRM = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m2 = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io2 = itk::NiftiImageIO::New();
+    reader_m2->SetImageIO(mask_io2);
+    reader_m2->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/02-05_mask.nii");
+    try {
+        reader_m2->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading US mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    mask_IRM = reader_m2->GetOutput();
+	crane2.maskcrane(mask_IRM);
+	
+	
+
+	crane2.sauvegardeimage();
+	rescaled_IRM=crane2.getcraneROI();
+
 	cout<<"region selectionné"<<endl;
 	
 	
@@ -511,12 +644,12 @@ int main(int argc, const char * argv[]) {
 	//*************************************************************************
   // Calcul de volume
   //*************************************************************************
-	/*
+	
 	Roi_crane volumeirm(rescaled_IRM);
 	volumeirm.maskcrane(mask_US);
 	volumeirm.setdim();
 	volumeirm.calculvolumecrane();
-	*/
+	
 
 
 
@@ -833,14 +966,14 @@ int main(int argc, const char * argv[]) {
 	//US_shrunk->SetOrigin(origine);
 	
 
-    LC2_function LC2 = LC2_function(rescaled_IRM,US_shrunk,outputPath);//MRI_shrunk or rescaled
+    LC2_function LC2 = LC2_function(US_shrunk,rescaled_IRM,outputPath);//MRI_shrunk or rescaled
     //make sure that the mask is computed on US_Shrunk but that we use the rescaled image to compute LC2
     //LC2.setMovingImage(rescaled_US);
-    LC2.setMaxRot(0.3); //0.3 for best initialisation
-    LC2.setMaxTrans(5);//10
+    LC2.setMaxRot(0.2); //0.3 for best initialisation
+    LC2.setMaxTrans(7);//10
 	LC2.setMaxScale(1.1); //valeur arbitraire a verifier
 	//plus petit shear
-	LC2.setMaxShear(0.3);
+	LC2.setMaxShear(0.2);
     LC2.setRadius(radius);
     
     if(useLiverMask) LC2.setLiverMask(LiverMask);
@@ -896,8 +1029,8 @@ int main(int argc, const char * argv[]) {
 	//Scale
 		AffineTransformType::OutputVectorType scalefactor;
 		scalefactor[0]=1+initialParameters_affineT(3)*(LC2.getMaxScale()-1)/(LC2.getRadius());
-		scalefactor[1]=1+initialParameters_affineT(4)*(LC2.getMaxScale()-1)/(LC2.getRadius());
-		scalefactor[2]=1+initialParameters_affineT(5)*(LC2.getMaxScale()-1)/(LC2.getRadius());
+		scalefactor[1]=1+initialParameters_affineT(3)*(LC2.getMaxScale()-1)/(LC2.getRadius());
+		scalefactor[2]=1+initialParameters_affineT(3)*(LC2.getMaxScale()-1)/(LC2.getRadius());
 
 		finalAffTsf->Scale(scalefactor,true);
 
@@ -918,12 +1051,12 @@ int main(int argc, const char * argv[]) {
 		coefficient[5]=initialParameters_affineT(11)*LC2.getMaxShear()/(LC2.getRadius());
 
 		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
-		 //finalAffTsf->Shear(0,1,coefficient[0]);
-		/// finalAffTsf->Shear(1,0,coefficient[1]);
-		// finalAffTsf->Shear(2,0,coefficient[2]);
-		//finalAffTsf->Shear(0,2,coefficient[3]);
-		// finalAffTsf->Shear(1,2,coefficient[4]);
-		// finalAffTsf->Shear(2,1,coefficient[5]);
+		 finalAffTsf->Shear(0,1,coefficient[0]);
+		 finalAffTsf->Shear(1,0,coefficient[1]);
+		 finalAffTsf->Shear(2,0,coefficient[2]);
+		finalAffTsf->Shear(0,2,coefficient[3]);
+		 finalAffTsf->Shear(1,2,coefficient[4]);
+		 finalAffTsf->Shear(2,1,coefficient[5]);
 		 
 		
 
@@ -979,17 +1112,17 @@ int main(int argc, const char * argv[]) {
     
     
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
-    resampler->SetInput(image_US);
+    resampler->SetInput(image_IRM);
     resampler->SetTransform(finalAffTsf);
     //resampler->SetSize(image_US->GetLargestPossibleRegion().GetSize());
     //resampler->SetOutputSpacing(image_US->GetSpacing());
    // resampler->SetOutputDirection(finalAffTsf->GetInverseMatrix()*image_US->GetDirection());
    // resampler->SetOutputOrigin(finalAffTsf->GetInverseTransform()->TransformPoint(image_US->GetOrigin()));
 
-	resampler->SetSize(image_IRM->GetLargestPossibleRegion().GetSize());
-    resampler->SetOutputSpacing(image_IRM->GetSpacing());
-    resampler->SetOutputDirection(image_IRM->GetDirection());
-    resampler->SetOutputOrigin(image_IRM->GetOrigin());
+	resampler->SetSize(image_US->GetLargestPossibleRegion().GetSize());
+    resampler->SetOutputSpacing(image_US->GetSpacing());
+    resampler->SetOutputDirection(image_US->GetDirection());
+    resampler->SetOutputOrigin(image_US->GetOrigin());
     //est ce que c'est une bonne idee de garder l'image full res alors qu'on fait le recalage base sur l'us downsampled ?
     try {
             resampler->Update();
@@ -999,9 +1132,9 @@ int main(int argc, const char * argv[]) {
     }
 
     cout<<"verification origine : "<<endl;
-    cout<<"avant tsf : "<<image_US->GetOrigin()<<endl;
-    cout<<"apres : "<<finalAffTsf->GetInverseTransform()->TransformPoint(image_US->GetOrigin());
-	cout<<"apres IRM: "<<image_IRM->GetOrigin();
+    cout<<"avant tsf : "<<image_IRM->GetOrigin()<<endl;
+    cout<<"apres : "<<finalAffTsf->GetInverseTransform()->TransformPoint(image_IRM->GetOrigin());
+	cout<<"apres IRM: "<<image_US->GetOrigin();
     
     ImageType::Pointer finalImage = ImageType::New();
     finalImage = resampler->GetOutput();

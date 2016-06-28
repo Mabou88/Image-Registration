@@ -88,7 +88,7 @@ void LC2_function::computeGradient()
     std::cout<<"compute gradient image of fixed MRI image"<<std::endl;
     
     GradientFilterType::Pointer filterG = GradientFilterType::New();
-    filterG->SetInput(m_FixedImage);
+    filterG->SetInput(m_MovingImage);
     try {
         filterG->Update();
     } catch (itk::ExceptionObject &e) {
@@ -287,12 +287,13 @@ ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &para
        // std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
 
 		//essayer de scaler isotropique aussi!!!!!!
-
+		
+		//scale isotropique
 	//Scale
 		AffineTransformType::OutputVectorType scalefactor;
 		scalefactor[0]=1+params(3)*((m_maxScale-1)/m_radius);
-		scalefactor[1]=1+params(4)*((m_maxScale-1)/m_radius);
-		scalefactor[2]=1+params(5)*((m_maxScale-1)/m_radius);
+		scalefactor[1]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[2]=1+params(3)*((m_maxScale-1)/m_radius);
 
 		transformaff->Scale(scalefactor,true);
 
@@ -313,12 +314,12 @@ ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &para
 		coefficient[5]=params(11)*((m_maxShear)/m_radius);
 
 		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
-		// transformaff->Shear(0,1,coefficient[0]);
-		// transformaff->Shear(1,0,coefficient[1]);
-		// transformaff->Shear(2,0,coefficient[2]);
-		// transformaff->Shear(0,2,coefficient[3]);
-		// transformaff->Shear(1,2,coefficient[4]);
-		// transformaff->Shear(2,1,coefficient[5]);
+		 transformaff->Shear(0,1,coefficient[0]);
+		 transformaff->Shear(1,0,coefficient[1]);
+		 transformaff->Shear(2,0,coefficient[2]);
+		 transformaff->Shear(0,2,coefficient[3]);
+		 transformaff->Shear(1,2,coefficient[4]);
+		 transformaff->Shear(2,1,coefficient[5]);
 		 
 		
 
@@ -509,8 +510,8 @@ MaskType::Pointer LC2_function::TransformMask(const dlib::matrix<double> &params
 	//Scale
 		AffineTransformType::OutputVectorType scalefactor;
 		scalefactor[0]=1+params(3)*((m_maxScale-1)/m_radius);
-		scalefactor[1]=1+params(4)*((m_maxScale-1)/m_radius);
-		scalefactor[2]=1+params(5)*((m_maxScale-1)/m_radius);
+		scalefactor[1]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[2]=1+params(3)*((m_maxScale-1)/m_radius);
 
 		transformaff->Scale(scalefactor,true);
 
@@ -531,12 +532,12 @@ MaskType::Pointer LC2_function::TransformMask(const dlib::matrix<double> &params
 		coefficient[5]=params(11)*((m_maxShear)/m_radius);
 
 		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
-		// transformaff->Shear(0,1,coefficient[0]);
-		// transformaff->Shear(1,0,coefficient[1]);
-		// transformaff->Shear(2,0,coefficient[2]);
-		// transformaff->Shear(0,2,coefficient[3]);
-		// transformaff->Shear(1,2,coefficient[4]);
-		// transformaff->Shear(2,1,coefficient[5]);
+		 transformaff->Shear(0,1,coefficient[0]);
+		 transformaff->Shear(1,0,coefficient[1]);
+		 transformaff->Shear(2,0,coefficient[2]);
+		 transformaff->Shear(0,2,coefficient[3]);
+		 transformaff->Shear(1,2,coefficient[4]);
+		 transformaff->Shear(2,1,coefficient[5]);
 		 
 		
 
