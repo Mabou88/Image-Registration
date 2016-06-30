@@ -21,7 +21,7 @@ void Roi_crane::sauvegardeimage(){
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/roi_crane_P2V2_12.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/roi_crane_P2V2_4.nii");
   writer->SetInput(roi_crane);
   writer->Update();
 
@@ -97,18 +97,369 @@ void Roi_crane::zonegrise(){
 			}
 		}
 	}
-	/*
-	//derriere
+	//posterieur
 	for (int j=0;j<40;j++){
-		for (int i=0;i<180;i++){
+		for (int i=0;i<181;i++){
 			for (int k=0;k<181;k++){
 				itk::Index<3> curseur2={{i,j,k}};		
 				roi_crane->SetPixel(curseur2,0);
 			}
 		}
 	}
-	*/
+	//anterieur
+	for (int j=200;j<217;j++){
+		for (int i=0;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	//gauche droite
+	for (int j=0;j<217;j++){
+		for (int i=0;i<30;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	for (int j=0;j<217;j++){
+		for (int i=160;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
 
+}
+
+
+void Roi_crane::maskcrane(BinaryImageType::Pointer mask_us){
+	
+/*
+ typedef itk::ImageConstIterator<ImageType> iterator;
+ iterator it_m(mask_us,mask_us->GetBufferedRegion);
+
+ it_m.GoToBegin();
+
+ while(!it_m.IsAtEnd()){
+    //on recupere le point dans l'espace correspondant pour aller le chercher dans l'IRM
+     ImageType::IndexType index_m = it_m.GetIndex();
+	 ImageType::PixelType pixelvalue_m;
+	 pixelvalue_m=mask_us->GetPixel(index_m);
+	 ImageType::PointType pt;
+                     
+     mask_us->TransformIndexToPhysicalPoint(index_m, pt);
+	
+	 ImageType::IndexType index_us;
+	 roi_crane->TransformPhysicalPointToIndex(pt,index_us);
+	  ImageType::PixelType pixelvalue_us;
+	  pixelvalue_us=roi_crane->GetPixel(index_us);
+
+	if (pixelvalue_m==1){
+		roi_crane->SetPixel(index_us,0);
+	}
+	
+
+	
+	
+ }
+ */
+	//si le masque superpose la partie on la garde l'image US sinon on l'élimine
+	typedef itk::LinearInterpolateImageFunction<BinaryImageType> LinearInterpolatorFilterType;
+	LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
+     interpolator->SetInputImage(mask_us);
+	 
+	ImageType::SizeType dimension=roi_crane->GetLargestPossibleRegion().GetSize();
+	for (int i=0;i<dimension[0];i++){
+		for (int j=0;j<dimension[1];j++){
+			for (int k=0;k<dimension[2];k++){
+				ImageType::IndexType index_us ={{i,j,k}};
+				 ImageType::PointType pt;
+                     
+				 roi_crane->TransformIndexToPhysicalPoint(index_us, pt);
+	
+				 
+				  ImageType::PixelType pixelvalue_m;
+				  ImageType::IndexType index_m;
+				  if(mask_us->TransformPhysicalPointToIndex(pt,index_m)){
+				  
+				  
+						  pixelvalue_m=mask_us->GetPixel(index_m);
+						  //pixelvalue_m=interpolator->Evaluate(pt);
+
+						if (pixelvalue_m!=1){
+							roi_crane->SetPixel(index_us,0);
+						}
+				  }else{
+					  roi_crane->SetPixel(index_us,0);
+				  }
+			}
+		}
+	}
+
+}
+
+
+void Roi_crane::calculvolumecrane(){
+
+	//*******************************************
+	//calcul du volume ellipsoide principal
+	//*******************************************
+	int min_x=dim_x;
+	int max_x=0;
+	int min_y=dim_y;
+	int max_y=0;
+	int min_z=dim_z;
+	int max_z=0;
+	int y_max_z;
+
+	//pour le volume de l'ellipse principal
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{i,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					if (i>max_x)
+						max_x=i;	
+					if (i<min_x)
+						min_x=i;
+					if (j>max_y)
+						max_y=j;			
+					if (j<min_y)
+						min_y=j;
+					if (k>max_z){
+						max_z=k;
+						y_max_z=j;
+					}
+					if (k<min_z)
+						min_z=k;
+										
+				}
+
+				
+			}
+		}
+	}
+	double centrage_haut_crane=double(y_max_z-min_y)/double(max_y-min_y);
+	cout<<"y max z"<<y_max_z<<endl;
+	cout<<"centrage"<<centrage_haut_crane<<endl;
+	//*******************************************
+	//calcul du volume ellipsoide principal
+	//*******************************************
+	cout<<"limite x"<<min_x<<max_x<<endl;
+	cout<<"limite y"<<min_y<<max_y<<endl;
+	cout<<"limite z"<<min_z<<max_z<<endl;
+
+	int a=(max_x-min_x)/2;
+	int b=(max_y-min_y)/2;
+	int c=(max_z-min_z)/2;
+
+	double fraction=1.333333;
+	double pi=3.14159265359;
+	double volume=fraction*pi*a*b*c;
+	
+	cout<<"volume"<<volume<<endl;
+	
+	//**********************************************
+	//calcul des droites de la secondes ellipses
+	//**********************************************
+	
+	ImageType::IndexType indexmin_z;
+	ImageType::IndexType indexmax_y;
+
+	int x_central=(min_x)+(max_x-min_x)/2;
+	cout<<"x central"<<x_central<<endl;
+
+	min_x=dim_x;
+	max_x=0;
+	min_y=dim_y;
+	max_y=0;
+	min_z=dim_z;
+	max_z=0;
+
+	//pour les valeurs sur la tranche sagittal central
+	for (int i=92;i<101;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{x_central,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					
+					if (j>max_y){
+						max_y=j;
+						indexmax_y[0]=x_central;
+						indexmax_y[1]=j;
+						indexmax_y[2]=k;
+					}
+					
+						
+					
+					if (k<min_z){
+						min_z=k;
+						indexmin_z[0]=x_central;
+						indexmin_z[1]=j;
+						indexmin_z[2]=k;
+					}
+					
+				}
+
+				
+			}
+		}
+	}
+
+	ImageType::IndexType point1=indexmax_y;
+	ImageType::IndexType point2=indexmin_z;
+	//Point 1 sera à y-1 au plus bas z
+	point1[1]=indexmax_y[1]-1;
+
+		
+	for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{point1[0],point1[1],k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+									
+					//prend le point le plus bas à y-1
+					if (k<point1[2]){
+						point1[2]=k;
+					}
+					
+				}
+
+				
+	}
+		
+	
+	cout<<"point1"<<point1<<endl;
+	cout<<"point2"<<point2<<endl;
+
+	int milieuz=(point1[2]-point2[2])/2+point2[2];
+	int milieuy=(point1[1]-point2[1])/2+point2[1];
+	
+	cout<<"milieuz"<<milieuz<<endl;
+	//int max_x_milieuz=dim_x;
+	//int min_x_milieuz=0;
+
+	//pour la largueur de la seconde ellipse
+	for (int j=0;j<dim_y;j++){
+			for (int i=0;i<dim_x;i++){
+				ImageType::IndexType index ={{i,j,milieuz}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					
+					if (i>max_x){
+						max_x=i;
+						
+					}
+					
+						
+					
+					if (i<min_x){
+						min_x=i;
+						
+					}
+					
+				}
+
+				
+			}
+	}
+	int point3x=max_x;
+	int point4x=min_x;
+	cout<<"min x"<<min_x<<endl;
+	cout<<"max x"<<max_x<<endl;
+	//min max en x y et z
+
+
+	
+
+	//centre de l'ellipse
+	ImageType::IndexType centre;
+	centre[0]=min_x+a;
+	centre[1]=min_y+b;
+	centre[2]=min_z+c;
+	//centre de la droite principal
+	ImageType::IndexType centredroite;
+	centredroite[0]=103;
+	centredroite[1]=milieuy;
+	centredroite[2]=milieuz;
+
+	//creation des points
+	ImageType::IndexType point5=centredroite;
+	ImageType::IndexType point6;
+
+	//2e ellipse
+	//point 1 et 2
+	int droiteprincipal=0;
+	//point 3 et 4
+	int droitelargueur=0;
+	//point 5 et 6
+	int petitedroite=0;
+	
+	
+
+	//pente
+	float pente=abs(double(point1[2]-point2[2]))/abs(double(point1[1]-point2[1]));
+	//intersection entre ellipse et droite
+	//ellipse centré à (122,77)
+
+	//translation de -122,-77 pour que le centre soit a lorigine
+	point5[2]=point5[2]-77;
+	point5[1]=point5[1]-122;
+	double m=-1/pente;
+	double ord=point5[2]-m*point5[1];
+	cout<<"ordonne"<<ord<<endl;
+	cout<<"pente"<<m<<endl;
+	cout<<"centre"<<centre<<endl;
+	cout<<"centredroit"<<point5<<endl;
+
+	//calcul des termes quadratiques
+	//a
+	double premier=b*b*m*m+c*c;
+	//b
+	double deuxieme=2*b*b*m*ord;
+	//c
+	double troisieme=b*b*(ord*ord-c*c);
+
+	//equation quadratique
+	point6[0]=x_central;
+	point6[1]=(-deuxieme+sqrt(deuxieme*deuxieme-4*premier*troisieme))/(2*premier);
+	point6[2]=m*point6[1]+ord;
+	point6[1]=point6[1]+122;
+	point6[2]=point6[2]+77;
+	cout<<"point6"<<point6<<endl;
+	//point 5 avant translation
+	point5[1]=point5[1]+122;
+	point5[2]=point5[2]+77;
+	cout<<"point5"<<point5<<endl;
+	
+	//equation ellipse y,z
+	//int point_y=sqrt((b*b)*(1-double((point_z-centre[2])*(point_z-centre[2]))/double(c*c)))+centre[1];
+
+	
+
+	cout<<point1<<point2<<endl;
+	cout<<point3x<<point4x<<endl;
+	cout<<milieuz<<endl;
+	
+	//calcul des droites de l'ellipsoide
+	petitedroite=sqrt((point5[2]-point6[2])*(point5[2]-point6[2])+(point5[1]-point6[1])*(point5[1]-point6[1]));
+	droiteprincipal=sqrt(abs(point1[1]-point2[1])*abs(point1[1]-point2[1])+abs(point1[2]-point2[2])*abs(point1[2]-point2[2]));
+	droitelargueur=point3x-point4x;
+	cout<<"droiteprincipal"<<droiteprincipal<<endl;
+	cout<<"droitelargueur"<<droitelargueur<<endl;
+	cout<<"petitedroite"<<petitedroite<<endl;
+	//calcul du volume de l'ellipsoide à enlever
+	double f2=0.125;
+	double V2=fraction*pi*droitelargueur*droiteprincipal*petitedroite*f2;
+	
+	//volume du cerveau final
+	double volumefinal=volume-V2;
+	cout<<"volumefinal"<<volumefinal<<endl;
 }
 //elimine les reflets de l'ultrason
 void Roi_crane::bordureexterieur(){
@@ -614,11 +965,11 @@ void Roi_crane::limitegauche(int z){
 					limite=true;
 				}
 				if (x==107 && y==161 && z==136){
-					cout<<"epaisseur"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				if (x==108 && y==121 && z==136){
-					cout<<"epaisseur milieu"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				//lorsqu'on sort de l'épaisseur du crane

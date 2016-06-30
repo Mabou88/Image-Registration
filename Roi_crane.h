@@ -15,10 +15,12 @@
 #include <iostream>
 #include <cmath>
 #include "itkArray.h"
+#include "itkLinearInterpolateImageFunction.h"
 
 using namespace std;
 
 typedef itk::Image<double,3> ImageType;
+typedef itk::Image<unsigned char, 3> BinaryImageType;
 typedef itk::ImageFileWriter<ImageType >  WriterType;
 
 class Roi_crane{
@@ -32,6 +34,8 @@ public:
  void setlimitepost_value(int v);
  void bordureexterieur();
  void zonegrise();
+ void maskcrane(BinaryImageType::Pointer mask_us);
+ void calculvolumecrane();
  //void modifiederriere();
  void sauvegardeimage();
  ImageType::Pointer getcraneROI();
