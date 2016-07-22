@@ -180,10 +180,10 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   resampler->SetOutputOrigin(  fixedImage->GetOrigin() );
   resampler->SetOutputSpacing( fixedImage->GetSpacing() );
   resampler->SetOutputDirection( fixedImage->GetDirection() );
-  resampler->SetDefaultPixelValue( 100 );
+  resampler->SetDefaultPixelValue( 0 );
 
   //ecris le resultats dans un fichier results.nii
-   typedef  double  OutputPixelType;
+   typedef  short  OutputPixelType;
   typedef itk::Image< OutputPixelType,3> OutputImageType;
   typedef itk::CastImageFilter<ImageType, OutputImageType > CastFilterType;
   typedef itk::ImageFileWriter< OutputImageType >  WriterType;

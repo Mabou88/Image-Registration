@@ -6,7 +6,7 @@
 #include "itkGradientImageFilter.h"
 #include "itkGradientMagnitudeImageFilter.h"
 
-typedef itk::Image<double,3> ImageType;
+typedef itk::Image<short,3> ImageType;
 typedef itk::CovariantVector< short, 3 > GradientPixelType;
 typedef itk::Image< GradientPixelType, 3 > GradientImageType;
 typedef itk::GradientImageFilter< ImageType, float, short, GradientImageType > VectorGradientFilterType;
