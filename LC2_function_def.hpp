@@ -39,20 +39,20 @@
 //DLIB ELEMENTS
 //#include <dlib/matrix.h>
 
-#include <matrix.h>
+#include <dlib\matrix.h>
 using namespace dlib;
 using namespace std;
 
 //images
 
-typedef itk::Image<double,3> ImageType;
+typedef itk::Image<short,3> ImageType;
 typedef itk::Image<unsigned char,3> MaskType;
 
 //matrices and vectors
-typedef itk::Matrix<double, 343,3> MType;
-typedef itk::Matrix<double,3,343> MTType;
+typedef itk::Matrix<double, 125,3> MType;
+typedef itk::Matrix<double,3,125> MTType;
 typedef itk::Matrix<double,3,3> M3Type;
-typedef itk::Vector<double, 343> VType;
+typedef itk::Vector<double, 125> VType;
 typedef itk::Vector<double,3> PType;
 
 //gradient

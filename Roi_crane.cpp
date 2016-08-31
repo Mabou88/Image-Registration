@@ -2,12 +2,17 @@
 typedef itk::ImageDuplicator< ImageType > DuplicatorType;
 
 Roi_crane::Roi_crane(ImageType::Pointer itkimageus ){
-		
-  DuplicatorType::Pointer duplicator = DuplicatorType::New();
-  duplicator->SetInputImage(itkimageus);
-  duplicator->Update();
+		cout<<"1"<<endl;
+ // DuplicatorType::Pointer duplicator = DuplicatorType::New();
+  cout<<"2"<<endl;
+  //duplicator->SetInputImage(itkimageus);
+  cout<<"3"<<endl;
+  //duplicator->Update();
+  cout<<"4"<<endl;
   roi_crane=ImageType::New();
-  roi_crane = duplicator->GetOutput();
+  cout<<"5"<<endl;
+  roi_crane = itkimageus;
+  cout<<"6"<<endl;
   
   
 }
@@ -17,11 +22,12 @@ ImageType::Pointer Roi_crane::getcraneROI(){
 
 void Roi_crane::sauvegardeimage(){
 	//sauvegarde l'image modifier
+	cout<<"sauvegarde de limage"<<endl;
   WriterType::Pointer   writer =  WriterType::New();
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/roi_crane_P2V2_12.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/roi_crane_P2V2_cercle.nii");
   writer->SetInput(roi_crane);
   writer->Update();
 
@@ -35,6 +41,45 @@ void Roi_crane::setdim(){
 	cout<< dim_x<<endl;
 	cout<< dim_y<<endl;
 	cout<< dim_z<<endl;
+}
+
+
+
+void Roi_crane::setlimitexy(int z){
+	lim_min_x=dim_x;
+	lim_max_x=0;
+	lim_min_y=dim_y;
+	lim_max_y=0;
+	
+
+	
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			
+				ImageType::IndexType index ={{i,j,z}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					if (i>lim_max_x)
+						lim_max_x=i;	
+					if (i<lim_min_x)
+						lim_min_x=i;
+					if (j>lim_max_y)
+						lim_max_y=j;			
+					if (j<lim_min_y)
+						lim_min_y=j;
+					
+										
+				}
+
+				
+			
+		}
+	}
+
+
+	cout<<"x"<<lim_min_x<<lim_max_x<<endl;
+	cout<<"y"<<lim_min_y<<lim_max_y<<endl;
+	
 }
 
 int Roi_crane::max(int a,int b){
@@ -97,18 +142,452 @@ void Roi_crane::zonegrise(){
 			}
 		}
 	}
-	/*
-	//derriere
+	//posterieur
 	for (int j=0;j<40;j++){
-		for (int i=0;i<180;i++){
+		for (int i=0;i<181;i++){
 			for (int k=0;k<181;k++){
 				itk::Index<3> curseur2={{i,j,k}};		
 				roi_crane->SetPixel(curseur2,0);
 			}
 		}
 	}
-	*/
+	//anterieur
+	for (int j=200;j<217;j++){
+		for (int i=0;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	//gauche droite
+	for (int j=0;j<217;j++){
+		for (int i=0;i<30;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
+	for (int j=0;j<217;j++){
+		for (int i=160;i<181;i++){
+			for (int k=0;k<181;k++){
+				itk::Index<3> curseur2={{i,j,k}};		
+				roi_crane->SetPixel(curseur2,0);
+			}
+		}
+	}
 
+}
+
+
+void Roi_crane::maskcrane(BinaryImageType::Pointer mask_us){
+	
+/*
+ typedef itk::ImageConstIterator<ImageType> iterator;
+ iterator it_m(mask_us,mask_us->GetBufferedRegion);
+
+ it_m.GoToBegin();
+
+ while(!it_m.IsAtEnd()){
+    //on recupere le point dans l'espace correspondant pour aller le chercher dans l'IRM
+     ImageType::IndexType index_m = it_m.GetIndex();
+	 ImageType::PixelType pixelvalue_m;
+	 pixelvalue_m=mask_us->GetPixel(index_m);
+	 ImageType::PointType pt;
+                     
+     mask_us->TransformIndexToPhysicalPoint(index_m, pt);
+	
+	 ImageType::IndexType index_us;
+	 roi_crane->TransformPhysicalPointToIndex(pt,index_us);
+	  ImageType::PixelType pixelvalue_us;
+	  pixelvalue_us=roi_crane->GetPixel(index_us);
+
+	if (pixelvalue_m==1){
+		roi_crane->SetPixel(index_us,0);
+	}
+	
+
+	
+	
+ }
+ */
+	//si le masque superpose la partie on la garde l'image US sinon on l'élimine
+	typedef itk::LinearInterpolateImageFunction<BinaryImageType> LinearInterpolatorFilterType;
+	LinearInterpolatorFilterType::Pointer interpolator = LinearInterpolatorFilterType::New();
+     interpolator->SetInputImage(mask_us);
+	 
+	ImageType::SizeType dimension=roi_crane->GetLargestPossibleRegion().GetSize();
+	for (int i=0;i<dimension[0]-1;i++){
+		for (int j=0;j<dimension[1]-1;j++){
+			for (int k=0;k<dimension[2]-1;k++){
+				ImageType::IndexType index_us ={{i,j,k}};
+				 ImageType::PointType pt;
+                     
+				 roi_crane->TransformIndexToPhysicalPoint(index_us, pt);
+	
+				 
+				  ImageType::PixelType pixelvalue_m;
+				  ImageType::IndexType index_m;
+				  if(mask_us->TransformPhysicalPointToIndex(pt,index_m)){
+				  
+				  
+						  pixelvalue_m=mask_us->GetPixel(index_m);
+						  //pixelvalue_m=interpolator->Evaluate(pt);
+
+						if (pixelvalue_m!=1){
+							roi_crane->SetPixel(index_us,0);
+						}
+				  }else{
+					 // roi_crane->SetPixel(index_us,0);
+				  }
+			}
+		}
+	}
+
+}
+
+int Roi_crane::getlargueurcerveau(){
+	return largueurcerveau;
+
+}
+
+ImageType::IndexType Roi_crane::getcentrecerveau(){
+	return centre;
+
+}
+void Roi_crane::calculvolumecrane(){
+
+	//*******************************************
+	//calcul du volume ellipsoide principal
+	//*******************************************
+	int min_x=dim_x;
+	int max_x=0;
+	int min_y=dim_y;
+	int max_y=0;
+	int min_z=dim_z;
+	int max_z=0;
+	int y_max_z;
+
+	//pour le volume de l'ellipse principal
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{i,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue>10){
+					
+
+
+					//compteur dans chaque direction
+					int c1=0;
+					int c2=0;
+					int c3=0;
+					int c4=0;
+					int c5=0;
+					int c6=0;
+					
+					//compteur pour verifier que la surface est significative et non un point égaré
+					for (int g=1;g<10;g++){
+						ImageType::PixelType pixelvalue1=0;
+						if(i<dim_x-10){
+						ImageType::IndexType index1 ={{i+g,j,k}};
+						pixelvalue1=roi_crane->GetPixel(index1);
+							}
+						ImageType::PixelType pixelvalue2=0;
+						if(i>10){
+						ImageType::IndexType index2 ={{i-g,j,k}};
+						pixelvalue2=roi_crane->GetPixel(index2);
+						}
+						ImageType::PixelType pixelvalue3=0;
+						if(j<dim_y-10){
+						ImageType::IndexType index3 ={{i,j+g,k}};
+						pixelvalue3=roi_crane->GetPixel(index3);
+						}
+						ImageType::PixelType pixelvalue4=0;
+						if(j>10){
+						ImageType::IndexType index4 ={{i,j-g,k}};
+						pixelvalue4=roi_crane->GetPixel(index4);
+						}
+						ImageType::PixelType pixelvalue5=0;
+						if(k<dim_z-10){
+						ImageType::IndexType index5 ={{i,j,k+g}};
+						pixelvalue5=roi_crane->GetPixel(index5);
+						}
+						ImageType::PixelType pixelvalue6=0;
+						if(k>10){
+						ImageType::IndexType index6 ={{i,j,k-g}};
+						pixelvalue6=roi_crane->GetPixel(index6);
+						}
+					
+							if(pixelvalue1>10)
+							c1++;
+							if(pixelvalue2>10)
+							c2++;
+							if(pixelvalue3>10)
+							c3++;
+							if(pixelvalue4>10)
+							c4++;
+							//tronc cérébrale vaut moins
+							if(pixelvalue5>10)
+							c5+=0.25;
+							if(pixelvalue6>10)
+							c6++;
+						
+						
+					}
+					int ct=c1+c2+c3+c4+c5+c6;
+					if (ct>30){
+						if (i>max_x)
+							max_x=i;	
+						if (i<min_x)
+							min_x=i;
+						if (j>max_y)
+							max_y=j;			
+						if (j<min_y)
+							min_y=j;
+						if (k>max_z){
+							max_z=k;
+							y_max_z=j;
+						}
+						if (k<min_z)
+							min_z=k;
+					}
+										
+				}
+
+				
+			}
+		}
+	}
+	double centrage_haut_crane=double(y_max_z-min_y)/double(max_y-min_y);
+	//cout<<"y max z"<<y_max_z<<endl;
+	//cout<<"centrage"<<centrage_haut_crane<<endl;
+	//*******************************************
+	//calcul du volume ellipsoide principal
+	//*******************************************
+	ImageType::SpacingType spacing_us=roi_crane->GetSpacing();
+	
+	cout<<"limite x"<<min_x<<max_x<<endl;
+	cout<<"limite y"<<min_y<<max_y<<endl;
+	cout<<"limite z"<<min_z<<max_z<<endl;
+
+	centre[0]=(max_x-min_x)/2+min_x;
+	centre[1]=(max_y-min_y)/2+min_y;
+	centre[2]=(max_z-min_z)/2+min_z;
+
+	cout<<"Centre du cerveau: "<<centre<<endl;
+
+	largueurcerveau=((max_x-min_x))*spacing_us[0];
+	cout<<"largueur"<<largueurcerveau<<endl;
+
+	int a=((max_x-min_x)/2)*spacing_us[0];
+	int b=((max_y-min_y)/2)*spacing_us[1];
+	int c=((max_z-min_z)/2)*spacing_us[2];
+
+	cout<<"a"<<a<<"b"<<b<<"c"<<c<<endl;
+	double fraction=1.333333;
+	double pi=3.14159265359;
+	double volume=fraction*pi*a*b*c;
+	
+	cout<<"volume"<<volume<<endl;
+	
+	//**********************************************
+	//calcul des droites de la secondes ellipses
+	//**********************************************
+	
+	ImageType::IndexType indexmin_z;
+	ImageType::IndexType indexmax_y;
+
+	int x_central=(min_x)+(max_x-min_x)/2;
+	//cout<<"x central"<<x_central<<endl;
+
+	min_x=dim_x;
+	max_x=0;
+	min_y=dim_y;
+	max_y=0;
+	min_z=dim_z;
+	max_z=0;
+
+	//pour les valeurs sur la tranche sagittal central
+	for (int i=92;i<101;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{x_central,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					
+					if (j>max_y){
+						max_y=j;
+						indexmax_y[0]=x_central;
+						indexmax_y[1]=j;
+						indexmax_y[2]=k;
+					}
+					
+						
+					
+					if (k<min_z){
+						min_z=k;
+						indexmin_z[0]=x_central;
+						indexmin_z[1]=j;
+						indexmin_z[2]=k;
+					}
+					
+				}
+
+				
+			}
+		}
+	}
+
+	ImageType::IndexType point1=indexmax_y;
+	ImageType::IndexType point2=indexmin_z;
+	//Point 1 sera à y-1 au plus bas z
+	point1[1]=indexmax_y[1]-1;
+
+		
+	for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{point1[0],point1[1],k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+									
+					//prend le point le plus bas à y-1
+					if (k<point1[2]){
+						point1[2]=k;
+					}
+					
+				}
+
+				
+	}
+		
+	
+	//cout<<"point1"<<point1<<endl;
+	//cout<<"point2"<<point2<<endl;
+
+	int milieuz=(point1[2]-point2[2])/2+point2[2];
+	int milieuy=(point1[1]-point2[1])/2+point2[1];
+	
+	//cout<<"milieuz"<<milieuz<<endl;
+	//int max_x_milieuz=dim_x;
+	//int min_x_milieuz=0;
+
+	//pour la largueur de la seconde ellipse
+	for (int j=0;j<dim_y;j++){
+			for (int i=0;i<dim_x;i++){
+				ImageType::IndexType index ={{i,j,milieuz}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue!=0){
+					
+					if (i>max_x){
+						max_x=i;
+						
+					}
+					
+						
+					
+					if (i<min_x){
+						min_x=i;
+						
+					}
+					
+				}
+
+				
+			}
+	}
+	int point3x=max_x;
+	int point4x=min_x;
+	//cout<<"min x"<<min_x<<endl;
+	//cout<<"max x"<<max_x<<endl;
+	//min max en x y et z
+
+
+	
+
+	//centre de l'ellipse
+	ImageType::IndexType centre;
+	centre[0]=min_x+a;
+	centre[1]=min_y+b;
+	centre[2]=min_z+c;
+	//centre de la droite principal
+	ImageType::IndexType centredroite;
+	centredroite[0]=103;
+	centredroite[1]=milieuy;
+	centredroite[2]=milieuz;
+
+	//creation des points
+	ImageType::IndexType point5=centredroite;
+	ImageType::IndexType point6;
+
+	//2e ellipse
+	//point 1 et 2
+	int droiteprincipal=0;
+	//point 3 et 4
+	int droitelargueur=0;
+	//point 5 et 6
+	int petitedroite=0;
+	
+	
+
+	//pente
+	float pente=abs(double(point1[2]-point2[2]))/abs(double(point1[1]-point2[1]));
+	//intersection entre ellipse et droite
+	//ellipse centré à (122,77)
+
+	//translation de -122,-77 pour que le centre soit a lorigine
+	point5[2]=point5[2]-77;
+	point5[1]=point5[1]-122;
+	double m=-1/pente;
+	double ord=point5[2]-m*point5[1];
+	//cout<<"ordonne"<<ord<<endl;
+	//cout<<"pente"<<m<<endl;
+	//cout<<"centre"<<centre<<endl;
+	//cout<<"centredroit"<<point5<<endl;
+
+	//calcul des termes quadratiques
+	//a
+	double premier=b*b*m*m+c*c;
+	//b
+	double deuxieme=2*b*b*m*ord;
+	//c
+	double troisieme=b*b*(ord*ord-c*c);
+
+	//equation quadratique
+	point6[0]=x_central;
+	point6[1]=(-deuxieme+sqrt(deuxieme*deuxieme-4*premier*troisieme))/(2*premier);
+	point6[2]=m*point6[1]+ord;
+	point6[1]=point6[1]+122;
+	point6[2]=point6[2]+77;
+	//cout<<"point6"<<point6<<endl;
+	//point 5 avant translation
+	point5[1]=point5[1]+122;
+	point5[2]=point5[2]+77;
+	//cout<<"point5"<<point5<<endl;
+	
+	//equation ellipse y,z
+	//int point_y=sqrt((b*b)*(1-double((point_z-centre[2])*(point_z-centre[2]))/double(c*c)))+centre[1];
+
+	
+
+	cout<<point1<<point2<<endl;
+	cout<<point3x<<point4x<<endl;
+	cout<<milieuz<<endl;
+	
+	//calcul des droites de l'ellipsoide
+	petitedroite=sqrt((point5[2]-point6[2])*(point5[2]-point6[2])+(point5[1]-point6[1])*(point5[1]-point6[1]));
+	droiteprincipal=sqrt(abs(point1[1]-point2[1])*abs(point1[1]-point2[1])+abs(point1[2]-point2[2])*abs(point1[2]-point2[2]));
+	droitelargueur=point3x-point4x;
+	//cout<<"droiteprincipal"<<droiteprincipal<<endl;
+	//cout<<"droitelargueur"<<droitelargueur<<endl;
+	//cout<<"petitedroite"<<petitedroite<<endl;
+	//calcul du volume de l'ellipsoide à enlever
+	double f2=0.125;
+	double V2=fraction*pi*droitelargueur*droiteprincipal*petitedroite*f2;
+	
+	//volume du cerveau final
+	double volumefinal=volume-V2;
+	cout<<"volumefinal"<<volumefinal<<endl;
 }
 //elimine les reflets de l'ultrason
 void Roi_crane::bordureexterieur(){
@@ -149,6 +628,829 @@ void Roi_crane::bordureexterieur(){
 
 	}
 		
+}
+// appeler la fonction dans un for pour chaque z de limage
+void Roi_crane::limiteparcercle(int z){
+	
+	//setlimitexy(z);
+	
+	// coord x et y du crane
+	int cranecercle[10000][2];
+	int cranecercleav[10000][2];
+	int cranecerclepost[10000][2];
+
+	//centre du crane
+	int centre[2];
+	double moitie=2;
+	centre[0]=int(double(dim_x)/moitie);
+	centre[1]=int(double(dim_y)/moitie);
+
+	if(z<140){
+		centre[0]=centre[0]+(150-z)/5;
+		centre[1]=centre[1]+(150-z)/2;
+	}
+
+	cout<<"centre"<<centre[0]<<centre[1]<<endl;
+
+	//pour le cercle
+	
+	int limitesuperieur=200-(z-60)/1.5;
+	int limiteinferieur=200-(z-60)/1.5;
+	cout<<"limite"<<limitesuperieur<<endl;
+
+	//determination des longueurs dellipse du crane pour le calcul du rayon
+	int largueur=130;
+	int longueur=180;
+
+	if (z<150){
+		longueur=longueur-(150-z);
+	}
+	if (z<120){
+		largueur=largueur-(120-z)/0.9;
+	}
+	
+	
+
+	
+	//****************************************************
+	//limite au niveau anterieur
+	//****************************************************
+	int position_a=0;
+	for (int i=lim_min_x;i<lim_max_x;i++){
+		
+
+		//redefinition des limites superieurs et inferieurs
+		int limitesuperieurant=limitesuperieur;
+		int limiteinferieurant=limiteinferieur;
+		if(z<85){
+			limitesuperieurant=limitesuperieurant/1.25;
+			limiteinferieurant=limiteinferieurant/1.25;
+			//cout<<"limite"<<limitesuperieurant<<endl;
+		}
+		if(110<z){
+			limitesuperieurant=limitesuperieurant*1.25;
+			limiteinferieurant=limiteinferieurant*1.25;
+			//cout<<"limite"<<limitesuperieurant<<endl;
+		}
+		
+		bool limite0=false;
+		int epaisseur0=0;
+		for (int j=0;j<centre[1];j++){
+
+			itk::Index<3> curseurread={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			if (pixelvalue>limitesuperieurant){
+				
+				epaisseur0+=1;
+			}
+			if (pixelvalue<limiteinferieurant){
+				//limite=false;
+				epaisseur0=0;
+			}
+			if (epaisseur0>3){
+				
+				limite0=true;
+			}
+			if (limite0==true && pixelvalue<limiteinferieurant){
+				cranecercleav[position_a][0]=i;
+				cranecercleav[position_a][1]=j;
+				position_a+=1;
+				epaisseur0=0;
+				limite0=false;
+				
+			}
+		}
+
+	}
+
+	//les coordonnees doivent rentrer dans un intervalle de rayon
+	int cranecercle_av2[10000][2];
+	int position_a2=0;
+	
+	cout<<"position a"<<position_a<<endl;
+	for (int p=0;p<position_a;p++){
+		//calcul du rayon
+		double rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur)*(longueur)));
+		if(z<148 && z>126){
+			int longueur_ant=longueur/((148-z)*0.025+1);
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur_ant)*(longueur_ant)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		if(z<127 && z>120){
+			int longueur_ant=longueur/((127-z)*0.03+1.5);
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur_ant)*(longueur_ant)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		if(z<121 && z>110){
+			int longueur_ant=longueur/((121-z)*0.03+1.65);
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur_ant)*(longueur_ant)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		if(z<111 && z>89){
+			int longueur_ant=longueur/((110-z)*0.025+1.95);
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur_ant)*(longueur_ant)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		if(z<90){
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur/1.25*largueur/1.25)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur/3.5)*(longueur/3.5)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		if(z<72){
+			rayon=(double((cranecercleav[p][0]-centre[0])*(cranecercleav[p][0]-centre[0]))/double(largueur/1.25*largueur/1.25)+double((cranecercleav[p][1]-centre[1])*(cranecercleav[p][1]-centre[1]))/double((longueur/3.5)*(longueur/3.5)));
+			cout<<"rayon ant"<<rayon<<endl;
+		}
+		//cout<<"rayon"<<rayon<<endl;
+		if (0.75<rayon && rayon<20){
+			cranecercle_av2[position_a2][0]=cranecercleav[p][0];
+			cranecercle_av2[position_a2][1]=cranecercleav[p][1];
+			position_a2+=1;
+			
+		}
+	}
+	//ajuste ceux qui rentre dans les limites du rayon
+	cout<<"position 2a"<<position_a2<<endl;
+
+	for (int a=0;a<position_a2;a++){
+		int x=cranecercle_av2[a][0];
+		int y=cranecercle_av2[a][1];
+
+		
+		itk::Index<3> curseur={{x,y,z}};
+		roi_crane->SetPixel(curseur,0);
+		
+		
+		
+			for (int n=0;n<y;n++){
+				itk::Index<3> curseurwrite={{x,n,z}};
+				//cout<<"x"<<n<<endl;
+				roi_crane->SetPixel(curseurwrite,0);
+				
+			}
+			
+			
+	}
+	//****************************************************
+	//limite au niveau postérieur
+	//****************************************************
+	int positionpost=0;
+	for (int i=lim_min_x;i<lim_max_x;i++){
+		bool limitepost=false;
+		int epaisseurpost=0;
+		int limitepost_y=centre[1];
+
+		int limitesuperieur_p=limitesuperieur;
+		int limiteinferieur_p=limiteinferieur;
+
+
+		if(z>=150){
+			limitesuperieur_p=limitesuperieur/1.25;
+			limiteinferieur_p=limiteinferieur/1.25;
+
+		}
+
+		for (int j=lim_max_y;j>limitepost_y;j--){
+
+			itk::Index<3> curseurread={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			if (pixelvalue>limitesuperieur_p){
+				
+				epaisseurpost+=1;
+			}
+			if (pixelvalue<limiteinferieur_p){
+				//limite=false;
+				epaisseurpost=0;
+			}
+			if (epaisseurpost>3){
+				
+				limitepost=true;
+			}
+			if (limitepost==true && pixelvalue<limiteinferieur_p){
+				cranecerclepost[positionpost][0]=i;
+				cranecerclepost[positionpost][1]=j;
+				positionpost+=1;
+				epaisseurpost=0;
+				limitepost=false;
+				
+			}
+		}
+
+	}
+
+	//les coordonnees doivent rentrer dans un intervalle de rayon
+	int cranecerclepost2[10000][2];
+	int positionpost2=0;
+	
+	
+	for (int p=0;p<positionpost;p++){
+		//calcul du rayon
+		double rayon=(double((cranecerclepost[p][0]-centre[0])*(cranecerclepost[p][0]-centre[0]))/double(largueur*largueur)+double((cranecerclepost[p][1]-centre[1])*(cranecerclepost[p][1]-centre[1]))/double((longueur)*(longueur)));
+		if(z<80){
+			rayon=(double((cranecerclepost[p][0]-centre[0])*(cranecerclepost[p][0]-centre[0]))/double((largueur)*(largueur))+double((cranecerclepost[p][1]-centre[1])*(cranecerclepost[p][1]-centre[1]))/double((longueur/2.6)*(longueur/2.6)));
+			//cout<<"rayon"<<rayon<<endl;		
+		}
+		//cout<<"rayon"<<rayon<<endl;
+		if (0.85<rayon && rayon<20){
+			cranecerclepost2[positionpost2][0]=cranecerclepost[p][0];
+			cranecerclepost2[positionpost2][1]=cranecerclepost[p][1];
+			positionpost2+=1;
+			
+		}
+	}
+	//ajuste ceux qui rentre dans les limites du rayon
+	cout<<"longueur"<<longueur<<endl;
+
+	for (int a=0;a<positionpost2;a++){
+		int x=cranecerclepost2[a][0];
+		int y=cranecerclepost2[a][1];
+
+		
+		itk::Index<3> curseur={{x,y,z}};
+		roi_crane->SetPixel(curseur,0);
+		
+		
+		
+		for (int n=lim_max_y;n>y;n--){
+				itk::Index<3> curseurwrite={{x,n,z}};
+				//cout<<"x"<<n<<endl;
+				roi_crane->SetPixel(curseurwrite,0);
+				
+			}
+			
+			
+	}
+	//***********************************************
+	// par la gauche et la droite
+	//***********************************************
+	int position=0;
+	for (int j=lim_min_y;j<lim_max_y;j++){
+		//1ere moitie
+		bool limite=false;
+		int epaisseur=0;
+		
+		int limitesuperieur_gd=limitesuperieur;
+		int limiteinferieur_gd=limiteinferieur;
+		
+		if(z>140){
+			int limitesuperieur_gd=limitesuperieur/1.75;
+			int limiteinferieur_gd=limiteinferieur/1.75;
+
+		}
+		
+		for (int i=lim_max_x;i>centre[0];i--){
+			
+			
+			
+			itk::Index<3> curseurread={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			if (pixelvalue>limitesuperieur_gd){
+				
+				epaisseur+=1;
+			}
+			if (pixelvalue<limiteinferieur_gd){
+				//limite=false;
+				epaisseur=0;
+			}
+			if (epaisseur>3){
+				
+				limite=true;
+			}
+			if (limite==true && pixelvalue<limiteinferieur_gd){
+				cranecercle[position][0]=i;
+				cranecercle[position][1]=j;
+				position+=1;
+				epaisseur=0;
+				limite=false;
+				
+			}
+
+
+		
+		}
+
+		bool limite2=false;
+		int epaisseur2=0;
+		//2e moitie
+
+		for (int i2=lim_min_x;i2<centre[0];i2++){
+			
+			
+			
+			itk::Index<3> curseurread={{i2,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+
+			if (pixelvalue>limitesuperieur)
+				epaisseur2+=1;
+			if (pixelvalue<limiteinferieur){
+				//limite=false;
+				epaisseur2=0;
+			}
+			if (epaisseur2>3)
+				limite2=true;
+			if (limite2==true && pixelvalue<limiteinferieur){
+				cranecercle[position][0]=i2;
+				cranecercle[position][1]=j;
+				position+=1;
+				epaisseur2=0;
+				limite2=false;
+			}
+		
+		}
+	}
+	cout<<"position"<<position<<endl;
+	//cout<<"calcul du rayon"<<endl;
+
+	//les coordonnees doivent rentrer dans un intervalle de rayon
+	int cranecercle_2[10000][2];
+	int position_2=0;
+	
+	
+	for (int p=0;p<position;p++){
+		//calcul du rayon
+		
+		double rayon=(double((cranecercle[p][0]-centre[0])*(cranecercle[p][0]-centre[0]))/double(largueur*largueur)+double((cranecercle[p][1]-centre[1])*(cranecercle[p][1]-centre[1]))/double(longueur*longueur));
+		if (z<100){
+			rayon=(double((cranecercle[p][0]-centre[0])*(cranecercle[p][0]-centre[0]))/double((largueur/1.1)*(largueur/1.1))+double((cranecercle[p][1]-centre[1])*(cranecercle[p][1]-centre[1]))/double((longueur/1.2)*(longueur/1.2)));
+		}
+		if (z<70){
+			rayon=(double((cranecercle[p][0]-centre[0])*(cranecercle[p][0]-centre[0]))/double((largueur/1.5)*(largueur/1.5))+double((cranecercle[p][1]-centre[1])*(cranecercle[p][1]-centre[1]))/double((longueur/1.25)*(longueur/1.25)));
+		}
+		//cout<<"rayon"<<rayon<<endl;
+		if (0.85<rayon && rayon<20){
+			cranecercle_2[position_2][0]=cranecercle[p][0];
+			cranecercle_2[position_2][1]=cranecercle[p][1];
+			position_2+=1;
+			
+		}
+	}
+	
+	//cout<<"position 2"<<position_2<<endl;
+	//cout<<"ajustement des limites"<<endl;
+
+
+	// les coordonnees restantes sont utilisées pour faire le masque
+	for (int a=0;a<position_2;a++){
+		int x=cranecercle_2[a][0];
+		int y=cranecercle_2[a][1];
+
+		
+		itk::Index<3> curseur={{x,y,z}};
+		roi_crane->SetPixel(curseur,0);
+		
+
+		if (x<centre[0]){
+			for (int n=x;n>lim_min_x;n--){
+				itk::Index<3> curseurwrite={{n,y,z}};
+				//cout<<"x"<<n<<endl;
+				roi_crane->SetPixel(curseurwrite,0);
+				
+			}
+		}
+		if (x>centre[0]){
+			for (int n=x;n<lim_max_x+1;n++){
+				itk::Index<3> curseurwrite={{n,y,z}};
+				
+				roi_crane->SetPixel(curseurwrite,0);
+				
+			}
+		}
+		
+	}
+	cout<<"z"<<z<<"L"<<longueur<<"y_centre"<<centre[1]<<endl;
+
+}
+
+void Roi_crane::regionexterieur(int z){
+	int centre[2];
+	double moitie=2;
+	centre[0]=int(double(dim_x)/moitie);
+	centre[1]=int(double(dim_y)/moitie);
+
+	int a=180-(180-z)*1.75;
+	int b=130-(180-z)/2;
+	//pour les tranches sur le côtés de l'image
+	
+	//par les côtés en x
+	for (int j=0;j<dim_y;j++){
+		for (int i=0;i<centre[0]-b/1.3;i++){
+		itk::Index<3> curseurread={{i,j,z}};
+		ImageType::PixelType pixelvalue;
+		pixelvalue=roi_crane->GetPixel(curseurread);
+			if (pixelvalue==0){
+				for (int ii=i;ii>=0;ii--){
+					itk::Index<3> curseurwrite={{ii,j,z}};
+					roi_crane->SetPixel(curseurwrite,0);
+				}
+			}
+
+		}
+		for (int i=lim_max_x;i>centre[0]+b/1.3;i--){
+		itk::Index<3> curseurread={{i,j,z}};
+		ImageType::PixelType pixelvalue;
+		pixelvalue=roi_crane->GetPixel(curseurread);
+			if (pixelvalue==0){
+				for (int ii=i;ii<lim_max_x;ii++){
+					itk::Index<3> curseurwrite={{ii,j,z}};
+					roi_crane->SetPixel(curseurwrite,0);
+				}
+			}
+
+		}
+		itk::Index<3> curseurread={{lim_max_x-1,j,z}};
+		ImageType::PixelType pixelvalue;
+		pixelvalue=roi_crane->GetPixel(curseurread);
+		if(pixelvalue==0){
+			//itk::Index<3> curseurwrite={{lim_max_x,j,z}};
+			//roi_crane->SetPixel(curseurwrite,0);
+		}
+	}
+	
+	
+	//par les cotés en y
+	
+	for (int i=lim_min_x;i<lim_max_x;i++){
+		for (int j=0;j<centre[1]/1.25;j++){
+		itk::Index<3> curseurread0={{i,j,z}};
+		ImageType::PixelType pixelvalue;
+		pixelvalue=roi_crane->GetPixel(curseurread0);
+			if (pixelvalue==0){
+				for (int jj=j;jj>=0;jj--){
+					itk::Index<3> curseurwrite0={{i,jj,z}};
+					roi_crane->SetPixel(curseurwrite0,0);
+				}
+			}
+
+		}
+	}
+
+	for (int i=0;i<lim_max_x;i++){
+		for (int j=lim_max_y;j>centre[1]*1.25;j--){
+		itk::Index<3> curseurread00={{i,j,z}};
+		ImageType::PixelType pixelvalue00;
+		pixelvalue00=roi_crane->GetPixel(curseurread00);
+			if (pixelvalue00==0){
+				for (int jj=j;jj<lim_max_y;jj++){
+					itk::Index<3> curseurwrite00={{i,jj,z}};
+					roi_crane->SetPixel(curseurwrite00,0);
+				}
+			}
+
+		}
+	}
+	
+	if (z<90){
+		//par les côtés en x
+		for (int j=0;j<dim_y;j++){
+			for (int i=0;i<centre[0]/1.1;i++){
+			itk::Index<3> curseurread={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+				if (pixelvalue==0){
+					for (int ii=i;ii>=0;ii--){
+						itk::Index<3> curseurwrite={{ii,j,z}};
+						roi_crane->SetPixel(curseurwrite,0);
+					}
+				}
+
+			}
+			for (int i=lim_max_x;i>centre[0]*1.1;i--){
+			itk::Index<3> curseurread={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread);
+				if (pixelvalue==0){
+					for (int ii=i;ii<lim_max_x;ii++){
+						itk::Index<3> curseurwrite={{ii,j,z}};
+						roi_crane->SetPixel(curseurwrite,0);
+					}
+				}
+
+			}
+		}
+		//par les cotés en y
+	
+		for (int i=lim_min_x;i<lim_max_x+1;i++){
+			for (int j=0;j<centre[1]/1.1;j++){
+			itk::Index<3> curseurread0={{i,j,z}};
+			ImageType::PixelType pixelvalue;
+			pixelvalue=roi_crane->GetPixel(curseurread0);
+				if (pixelvalue==0){
+					for (int jj=j;jj>=0;jj--){
+						itk::Index<3> curseurwrite0={{i,jj,z}};
+						roi_crane->SetPixel(curseurwrite0,0);
+					}
+				}
+
+			}
+		}
+
+		for (int i=0;i<lim_max_x+1;i++){
+			for (int j=lim_max_y;j>centre[1]*1.1;j--){
+			itk::Index<3> curseurread00={{i,j,z}};
+			ImageType::PixelType pixelvalue00;
+			pixelvalue00=roi_crane->GetPixel(curseurread00);
+				if (pixelvalue00==0){
+					for (int jj=j;jj<lim_max_y;jj++){
+						itk::Index<3> curseurwrite00={{i,jj,z}};
+						roi_crane->SetPixel(curseurwrite00,0);
+					}
+				}
+
+			}
+		}
+	}
+
+	//Pour les tranches au milieu qui ont encore leur intensite encadré par du noir
+	if(z<150){
+
+		//limite anterieur
+		for (int i=lim_min_x;i<lim_max_x;i++){
+			//bool trou=false;
+			//bool bord=false;
+			//int bordy=centre[1];
+			int longueurtrou=0;
+			int largueurtrou=60+(180-z)/4;
+			for (int j=0;j<lim_max_y;j++){
+
+				if(j>lim_min_y+40 && longueurtrou<10){
+				break;
+				}
+				itk::Index<3> curseurread0={{i,j,z}};
+				ImageType::PixelType pixelvalue;
+				pixelvalue=roi_crane->GetPixel(curseurread0);
+				if(pixelvalue!=0){
+					longueurtrou++;
+					bool trouaccepte=false;
+					for (int ii=0;ii<largueurtrou/2;ii++){
+						itk::Index<3> curseurread1={{i+ii,j,z}};
+						ImageType::PixelType pixelvalue1;
+						pixelvalue1=roi_crane->GetPixel(curseurread1);
+						itk::Index<3> curseurread2={{i-ii,j,z}};
+						ImageType::PixelType pixelvalue2;
+						pixelvalue2=roi_crane->GetPixel(curseurread2);
+						if (pixelvalue1==0 && pixelvalue2==0){
+							trouaccepte=true;
+						}
+					}
+					if(trouaccepte){
+						for (int jj=0;jj<largueurtrou/2;jj++){
+						itk::Index<3> curseurwrite0={{i+jj,j,z}};
+						roi_crane->SetPixel(curseurwrite0,0);
+						itk::Index<3> curseurwrite1={{i-jj,j,z}};
+						roi_crane->SetPixel(curseurwrite1,0);
+						}
+
+
+					}
+				}
+			}
+		}
+
+		//limite posterieur
+		for (int i=lim_min_x;i<lim_max_x;i++){
+			//bool trou=false;
+			//bool bord=false;
+			//int bordy=centre[1];
+			int longueurtrou=0;
+			for (int j=lim_max_y;j>0;j--){
+
+				if(j<lim_max_y-30 && longueurtrou<10){
+				break;
+				}
+				itk::Index<3> curseurread0={{i,j,z}};
+				ImageType::PixelType pixelvalue;
+				pixelvalue=roi_crane->GetPixel(curseurread0);
+				if(pixelvalue!=0){
+					longueurtrou++;
+					bool trouaccepte=false;
+					for (int ii=0;ii<30;ii++){
+						itk::Index<3> curseurread1={{i+ii,j,z}};
+						ImageType::PixelType pixelvalue1;
+						pixelvalue1=roi_crane->GetPixel(curseurread1);
+						itk::Index<3> curseurread2={{i-ii,j,z}};
+						ImageType::PixelType pixelvalue2;
+						pixelvalue2=roi_crane->GetPixel(curseurread2);
+						if (pixelvalue1==0 && pixelvalue2==0){
+							trouaccepte=true;
+						}
+					}
+					if(trouaccepte){
+						for (int jj=0;jj<30;jj++){
+						itk::Index<3> curseurwrite0={{i+jj,j,z}};
+						roi_crane->SetPixel(curseurwrite0,0);
+						itk::Index<3> curseurwrite1={{i-jj,j,z}};
+						roi_crane->SetPixel(curseurwrite1,0);
+						}
+
+
+					}
+				}
+			}
+		}
+		
+		//limite droite
+		for (int j=lim_min_y;j<lim_max_y;j++){
+			//bool trou=false;
+			//bool bord=false;
+			//int bordy=centre[1];
+			int longueurtrou=0;
+			for (int i=lim_max_x;i>lim_min_x;i--){
+
+				if(i<lim_max_x-30 && longueurtrou<10){
+				break;
+				}
+				itk::Index<3> curseurread0={{i,j,z}};
+				ImageType::PixelType pixelvalue;
+				pixelvalue=roi_crane->GetPixel(curseurread0);
+				if(pixelvalue!=0){
+					longueurtrou++;
+					bool trouaccepte=false;
+					for (int ii=0;ii<40;ii++){
+						itk::Index<3> curseurread1={{i,j+ii,z}};
+						ImageType::PixelType pixelvalue1;
+						pixelvalue1=roi_crane->GetPixel(curseurread1);
+						itk::Index<3> curseurread2={{i,j-ii,z}};
+						ImageType::PixelType pixelvalue2;
+						pixelvalue2=roi_crane->GetPixel(curseurread2);
+						if (pixelvalue1==0 && pixelvalue2==0){
+							trouaccepte=true;
+						}
+					}
+					if(trouaccepte){
+						for (int jj=0;jj<40;jj++){
+						itk::Index<3> curseurwrite0={{i,j+jj,z}};
+						roi_crane->SetPixel(curseurwrite0,0);
+						itk::Index<3> curseurwrite1={{i,j-jj,z}};
+						roi_crane->SetPixel(curseurwrite1,0);
+						}
+					}
+
+
+				}
+			}
+		}
+		
+
+		//limite gauche
+		for (int j=lim_min_y;j<lim_max_y;j++){
+			//bool trou=false;
+			//bool bord=false;
+			//int bordy=centre[1];
+			int longueurtrou=0;
+			for (int i=0;i<lim_max_x;i++){
+
+				if(i>lim_min_x+30 && longueurtrou<10){
+				break;
+				}
+				itk::Index<3> curseurread0={{i,j,z}};
+				ImageType::PixelType pixelvalue;
+				pixelvalue=roi_crane->GetPixel(curseurread0);
+				if(pixelvalue!=0){
+					longueurtrou++;
+					bool trouaccepte=false;
+					for (int ii=0;ii<40;ii++){
+						itk::Index<3> curseurread1={{i,j+ii,z}};
+						ImageType::PixelType pixelvalue1;
+						pixelvalue1=roi_crane->GetPixel(curseurread1);
+						itk::Index<3> curseurread2={{i,j-ii,z}};
+						ImageType::PixelType pixelvalue2;
+						pixelvalue2=roi_crane->GetPixel(curseurread2);
+						if (pixelvalue1==0 && pixelvalue2==0){
+							trouaccepte=true;
+						}
+					}
+					if(trouaccepte){
+						for (int jj=0;jj<40;jj++){
+						itk::Index<3> curseurwrite0={{i,j+jj,z}};
+						roi_crane->SetPixel(curseurwrite0,0);
+						itk::Index<3> curseurwrite1={{i,j-jj,z}};
+						roi_crane->SetPixel(curseurwrite1,0);
+						}
+					}
+
+
+				}
+			}
+		}
+	}
+		
+		
+	
+		
+		
+	
+	
+
+	
+	
+
+}
+
+void Roi_crane::regioninferieur(int k){
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int z=0;z<k;z++){
+				itk::Index<3> curseurwrite0={{i,j,z}};
+				roi_crane->SetPixel(curseurwrite0,0);
+			}
+
+		}
+
+	}
+	for (int i=400;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int z=0;z<dim_z;z++){
+				itk::Index<3> curseurwrite0={{i,j,z}};
+				roi_crane->SetPixel(curseurwrite0,0);
+			}
+
+		}
+
+	}
+
+}
+
+void Roi_crane::regionssuperieur(){
+
+	
+	int min_z=dim_z;
+	int max_z=0;
+	
+
+	//pour la hauteur de la limite superieur du crane
+	for (int i=0;i<dim_x;i++){
+		for (int j=0;j<dim_y;j++){
+			for (int k=0;k<dim_z;k++){
+				ImageType::IndexType index ={{i,j,k}};
+				ImageType::PixelType pixelvalue=roi_crane->GetPixel(index);
+				if (pixelvalue>10){
+														
+						
+						if (k>max_z)
+							max_z=k;
+							
+						if (k<min_z)
+							min_z=k;
+					
+										
+				}
+
+				
+			}
+		}
+	}
+	cout<<"max z hauteur"<<max_z<<endl;
+	ImageType::SpacingType spacingus=roi_crane->GetSpacing();
+
+	int hauteurindex=double(8.5)/(double(spacingus[2]));
+
+	cout<<"hauteur index"<<hauteurindex<<endl;
+	int nouvellehauteur=max_z-hauteurindex;
+
+	
+	setlimitexy(nouvellehauteur);
+	int centre_y=(lim_min_y+lim_max_y)/2;
+
+	//en ligne droite
+	for (int z=max_z;z>nouvellehauteur;z--){
+		for (int i=lim_min_x;i<lim_max_x;i++){
+			for (int j=lim_min_y;j<lim_max_y;j++){
+			
+				
+				ImageType::IndexType index ={{i,j,z}};
+				roi_crane->SetPixel(index,0);
+				
+
+				
+			
+			}
+		}
+
+	}
+	//pour arrondir les coins
+	
+	for (int i=lim_min_x-20;i<lim_max_x+20;i++){
+		for (int j=lim_min_y-20;j<lim_max_y+20;j++){
+			int différence=abs(j-centre_y)/10;
+			int nouvellehauteurcourbe=nouvellehauteur-différence;
+			for (int z=nouvellehauteur;z>nouvellehauteurcourbe;z--){
+				
+				ImageType::IndexType index ={{i,j,z}};
+				roi_crane->SetPixel(index,0);
+				
+
+				
+			
+			}
+		}
+
+	}
+	
 }
 
 void Roi_crane::limiteposterieur(){
@@ -614,11 +1916,11 @@ void Roi_crane::limitegauche(int z){
 					limite=true;
 				}
 				if (x==107 && y==161 && z==136){
-					cout<<"epaisseur"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				if (x==108 && y==121 && z==136){
-					cout<<"epaisseur milieu"<<endl;
+					
 					cout<< epaisseur<<endl;
 				}
 				//lorsqu'on sort de l'épaisseur du crane
