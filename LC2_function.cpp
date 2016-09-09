@@ -8,7 +8,7 @@
 
 #include "LC2_function.hpp"
 
-LC2_function::LC2_function(ImageType::Pointer im_Fixed, ImageType::Pointer im_Moving,string out)
+LC2_function::LC2_function(ImageType::Pointer im_Fixed, ImageType::Pointer im_Moving,string out, int type)
 {
     //std::cout<<"creating measure object"<<std::endl;
     m_outputPath=out;
@@ -20,10 +20,14 @@ LC2_function::LC2_function(ImageType::Pointer im_Fixed, ImageType::Pointer im_Mo
     
     m_maxTrans =0;
     m_maxRot = 0;
+	m_maxScale=0;
+	m_maxShear=0;
     m_radius = 0;
     
     m_useLiverMask=false;
-    
+    nombreloop=0;
+
+	typetransform=type;
     
 }
 
@@ -86,7 +90,7 @@ void LC2_function::computeGradient()
     std::cout<<"compute gradient image of fixed MRI image"<<std::endl;
     
     GradientFilterType::Pointer filterG = GradientFilterType::New();
-    filterG->SetInput(m_FixedImage);
+    filterG->SetInput(m_MovingImage);
     try {
         filterG->Update();
     } catch (itk::ExceptionObject &e) {
@@ -185,7 +189,7 @@ void LC2_function::computeMask()
 ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &params, int ind) const
 {
     ImageType::Pointer imageTransformed;
-    
+    //nombreloop+=1;
     //1 represents euler tsf
     if(ind==1)
     {
@@ -205,10 +209,21 @@ ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &para
         ImageType::PointType origin = m_MovingImage->GetOrigin();
         ImageType::SpacingType spacing = m_MovingImage->GetSpacing();
         ImageType::PointType center;
-        center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
-        center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
-        center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
-        
+       // center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
+        //center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
+        //center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+       
+		//center[0] =0;
+        //center[1] =0;
+        //center[2] =0;
+
+
+		//Patient 5
+		center[0]=111;
+		center[1]=80;
+		center[2]=111;
+
+		cout<<"center of rotation"<<center<<endl;
         
         EulerTransformType::ParametersType eulerFixedParameters(3);
         eulerFixedParameters[0] =center[0];
@@ -240,6 +255,180 @@ ImageType::Pointer LC2_function::TransformImage(const dlib::matrix<double> &para
 
         
     }
+	else if (ind=2){
+		AffineTransformType::Pointer transformaff = AffineTransformType::New();
+		AffineTransformType::Pointer transformaff2 = AffineTransformType::New();
+		AffineTransformType::Pointer transformaff3 = AffineTransformType::New();
+		AffineTransformType::Pointer transformaff4 = AffineTransformType::New();
+		
+		
+
+	///Rotation
+
+		//Définis l'axe de rotation avec un vecteur
+		AffineTransformType::OutputVectorType axederotation_x;
+		axederotation_x[0]=1;
+		axederotation_x[1]=0;
+		axederotation_x[2]=0;
+		AffineTransformType::OutputVectorType axederotation_y;
+		axederotation_y[0]=0;
+		axederotation_y[1]=1;
+		axederotation_y[2]=0;
+		AffineTransformType::OutputVectorType axederotation_z;
+		axederotation_z[0]=0;
+		axederotation_z[1]=0;
+		axederotation_z[2]=1;
+		
+		
+		///3er parametre sur les angles de rotation 1 pour chaque axe de rotation
+		//double anglerotation=0.3;
+		double anglerotation_x=params(0)*(m_maxRot/m_radius);
+		double anglerotation_y=params(1)*(m_maxRot/m_radius);
+		double anglerotation_z=params(2)*(m_maxRot/m_radius);
+
+	
+	
+		std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+		transformaff->Rotate3D(axederotation_x,anglerotation_x,true);
+		transformaff->Rotate3D(axederotation_y,anglerotation_y,true);
+		transformaff->Rotate3D(axederotation_z,anglerotation_z,true);
+
+       // std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+		//essayer de scaler isotropique aussi!!!!!!
+		
+		
+		//scale isotropique
+	//Scale
+		AffineTransformType::OutputVectorType scalefactor;
+		scalefactor[0]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[1]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[2]=1+params(3)*((m_maxScale-1)/m_radius);
+
+		transformaff->Scale(scalefactor,true);
+
+		
+		
+		 std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+		 
+	//Shear
+		
+
+
+		 double coefficient[6];
+		coefficient[0]=params(6)*((m_maxShear)/m_radius);
+		coefficient[1]=params(7)*((m_maxShear)/m_radius);
+		coefficient[2]=params(8)*((m_maxShear)/m_radius);
+		coefficient[3]=params(9)*((m_maxShear)/m_radius);
+		coefficient[4]=params(10)*((m_maxShear)/m_radius);
+		coefficient[5]=params(11)*((m_maxShear)/m_radius);
+
+		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
+		 transformaff->Shear(0,1,coefficient[0]);
+		 transformaff->Shear(1,0,coefficient[1]);
+		 transformaff->Shear(2,0,coefficient[2]);
+		 transformaff->Shear(0,2,coefficient[3]);
+		 transformaff->Shear(1,2,coefficient[4]);
+		 transformaff->Shear(2,1,coefficient[5]);
+		 
+		
+
+		 std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+		 
+	//translate
+		 AffineTransformType::OutputVectorType vecteurtranslation_x;
+		 AffineTransformType::OutputVectorType vecteurtranslation_y;
+		 AffineTransformType::OutputVectorType vecteurtranslation_z;
+		 vecteurtranslation_x[0]=1;
+		 vecteurtranslation_x[1]=0;
+		 vecteurtranslation_x[2]=0;
+		 vecteurtranslation_y[0]=0;
+		 vecteurtranslation_y[1]=1;
+		 vecteurtranslation_y[2]=0;
+		 vecteurtranslation_z[0]=0;
+		 vecteurtranslation_z[1]=0;
+		 vecteurtranslation_z[2]=1;
+
+		 vecteurtranslation_x=vecteurtranslation_x*params(12)*((m_maxTrans)/m_radius);
+		 vecteurtranslation_y=vecteurtranslation_y*params(13)*((m_maxTrans)/m_radius);
+		 vecteurtranslation_z=vecteurtranslation_z*params(14)*((m_maxTrans)/m_radius);
+
+		 transformaff->Translate(vecteurtranslation_x,true);
+		 transformaff->Translate(vecteurtranslation_y,true);
+		 transformaff->Translate(vecteurtranslation_z,true);
+
+		 std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+
+		 //Affine transform avec centre pré déterminé
+
+		AffineTransformfixedcenter::Pointer AffineTransformfixe=AffineTransformfixedcenter::New();
+
+		AffineTransformfixe->Rotate3D(axederotation_x,anglerotation_x,true);
+		AffineTransformfixe->Rotate3D(axederotation_y,anglerotation_y,true);
+		AffineTransformfixe->Rotate3D(axederotation_z,anglerotation_z,true);
+
+		AffineTransformfixe->Scale(scalefactor,true);
+
+	
+		 AffineTransformfixe->Shear(0,1,coefficient[0]);
+		 AffineTransformfixe->Shear(1,0,coefficient[1]);
+		 AffineTransformfixe->Shear(2,0,coefficient[2]);
+		 AffineTransformfixe->Shear(0,2,coefficient[3]);
+		 AffineTransformfixe->Shear(1,2,coefficient[4]);
+		 AffineTransformfixe->Shear(2,1,coefficient[5]);
+
+		  AffineTransformfixe->Translate(vecteurtranslation_x,true);
+		 AffineTransformfixe->Translate(vecteurtranslation_y,true);
+		 AffineTransformfixe->Translate(vecteurtranslation_z,true);
+     
+        ImageType::PointType center;
+       
+		//Patient 2
+        //center[0] =98;
+        //center[1] =68;
+        //center[2] =98;
+
+		//Patient 5
+		center[0]=111;
+		center[1]=80;
+		center[2]=111;
+
+
+		cout<<"center of rotation"<<center<<endl;
+
+		AffineTransformfixe->SetCenterOfRotationComponent(center);
+        
+        
+                     
+		ImageType::SizeType sizefixed=m_FixedImage->GetLargestPossibleRegion().GetSize();
+		//sizefixed[1]+=100;
+        
+        ResamplerType::Pointer resamplefilteraff = ResamplerType::New();
+        resamplefilteraff->SetInput(m_MovingImage);
+        resamplefilteraff->SetSize(sizefixed);
+        resamplefilteraff->SetOutputSpacing(m_FixedImage->GetSpacing());
+        resamplefilteraff->SetOutputDirection(m_FixedImage->GetDirection());
+        resamplefilteraff->SetOutputOrigin(m_FixedImage->GetOrigin());
+        //resamplefilteraff->SetTransform(transformaff);
+		resamplefilteraff->SetTransform(AffineTransformfixe);
+        
+
+		//InterpolatorNearestNeighbor::Pointer interpolator = InterpolatorNearestNeighbor::New();
+		//resamplefilteraff->SetInterpolator( interpolator );
+
+        
+        try {
+            resamplefilteraff->Update();
+        } catch (itk::ExceptionObject &e) {
+            std::cerr<<"error while transforming moving image"<<std::endl;
+            std::cerr<<e<<std::endl;
+        }
+        
+       imageTransformed= resamplefilteraff->GetOutput();
+
+	}
     
     return imageTransformed;
 }
@@ -267,9 +456,18 @@ MaskType::Pointer LC2_function::TransformMask(const dlib::matrix<double> &params
         ImageType::PointType origin = m_MovingImage->GetOrigin();
         ImageType::SpacingType spacing = m_MovingImage->GetSpacing();
         ImageType::PointType center;
-        center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
-        center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
-        center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+        //center[0] = origin[0]+spacing[0]*sizeUS[0]/2;
+        //center[1] = origin[1]+spacing[1]*sizeUS[1]/2;
+        //center[2] = origin[2]+spacing[2]*sizeUS[2]/2;
+		
+		//center[0] =0;
+        //center[1] =0;
+        //center[2] =0;
+
+		//Patient 5
+		center[0]=111;
+		center[1]=80;
+		center[2]=111;
         
         
         EulerTransformType::ParametersType eulerFixedParameters(3);
@@ -298,6 +496,163 @@ MaskType::Pointer LC2_function::TransformMask(const dlib::matrix<double> &params
         maskTsf = maskResampler->GetOutput();
         
     }
+	else if (ind=2){
+		AffineTransformType::Pointer transformaff = AffineTransformType::New();
+        ///Rotation
+
+		//Définis l'axe de rotation avec un vecteur
+		AffineTransformType::OutputVectorType axederotation_x;
+		axederotation_x[0]=1;
+		axederotation_x[1]=0;
+		axederotation_x[2]=0;
+		AffineTransformType::OutputVectorType axederotation_y;
+		axederotation_y[0]=0;
+		axederotation_y[1]=1;
+		axederotation_y[2]=0;
+		AffineTransformType::OutputVectorType axederotation_z;
+		axederotation_z[0]=0;
+		axederotation_z[1]=0;
+		axederotation_z[2]=1;
+		
+		
+		///3er parametre sur les angles de rotation 1 pour chaque axe de rotation
+		//double anglerotation=0.3;
+		double anglerotation_x=params(0)*(m_maxRot/m_radius);
+		double anglerotation_y=params(1)*(m_maxRot/m_radius);
+		double anglerotation_z=params(2)*(m_maxRot/m_radius);
+
+	
+	
+	//	std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+		transformaff->Rotate3D(axederotation_x,anglerotation_x,true);
+		transformaff->Rotate3D(axederotation_y,anglerotation_y,true);
+		transformaff->Rotate3D(axederotation_z,anglerotation_z,true);
+
+       // std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+		//essayer de scaler isotropique aussi!!!!!!
+
+	//Scale
+		AffineTransformType::OutputVectorType scalefactor;
+		scalefactor[0]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[1]=1+params(3)*((m_maxScale-1)/m_radius);
+		scalefactor[2]=1+params(3)*((m_maxScale-1)/m_radius);
+
+		transformaff->Scale(scalefactor,true);
+
+		
+		
+		 //std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+		 
+	//Shear
+		
+
+
+		 double coefficient[6];
+		coefficient[0]=params(6)*((m_maxShear)/m_radius);
+		coefficient[1]=params(7)*((m_maxShear)/m_radius);
+		coefficient[2]=params(8)*((m_maxShear)/m_radius);
+		coefficient[3]=params(9)*((m_maxShear)/m_radius);
+		coefficient[4]=params(10)*((m_maxShear)/m_radius);
+		coefficient[5]=params(11)*((m_maxShear)/m_radius);
+
+		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
+		 transformaff->Shear(0,1,coefficient[0]);
+		 transformaff->Shear(1,0,coefficient[1]);
+		 transformaff->Shear(2,0,coefficient[2]);
+		 transformaff->Shear(0,2,coefficient[3]);
+		 transformaff->Shear(1,2,coefficient[4]);
+		 transformaff->Shear(2,1,coefficient[5]);
+		 
+		
+
+		// std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+		 
+	//translate
+		 AffineTransformType::OutputVectorType vecteurtranslation_x;
+		 AffineTransformType::OutputVectorType vecteurtranslation_y;
+		 AffineTransformType::OutputVectorType vecteurtranslation_z;
+		 vecteurtranslation_x[0]=1;
+		 vecteurtranslation_x[1]=0;
+		 vecteurtranslation_x[2]=0;
+		 vecteurtranslation_y[0]=0;
+		 vecteurtranslation_y[1]=1;
+		 vecteurtranslation_y[2]=0;
+		 vecteurtranslation_z[0]=0;
+		 vecteurtranslation_z[1]=0;
+		 vecteurtranslation_z[2]=1;
+
+		 vecteurtranslation_x=vecteurtranslation_x*params(12)*((m_maxTrans)/m_radius);
+		 vecteurtranslation_y=vecteurtranslation_y*params(13)*((m_maxTrans)/m_radius);
+		 vecteurtranslation_z=vecteurtranslation_z*params(14)*((m_maxTrans)/m_radius);
+
+		 transformaff->Translate(vecteurtranslation_x,true);
+		 transformaff->Translate(vecteurtranslation_y,true);
+		 transformaff->Translate(vecteurtranslation_z,true);
+        
+		 //Affine transform en fixant le centre de rotation
+		 AffineTransformfixedcenter::Pointer AffineTransformfixe=AffineTransformfixedcenter::New();
+
+		AffineTransformfixe->Rotate3D(axederotation_x,anglerotation_x,true);
+		AffineTransformfixe->Rotate3D(axederotation_y,anglerotation_y,true);
+		AffineTransformfixe->Rotate3D(axederotation_z,anglerotation_z,true);
+
+		AffineTransformfixe->Scale(scalefactor,true);
+
+	
+		 AffineTransformfixe->Shear(0,1,coefficient[0]);
+		 AffineTransformfixe->Shear(1,0,coefficient[1]);
+		 AffineTransformfixe->Shear(2,0,coefficient[2]);
+		 AffineTransformfixe->Shear(0,2,coefficient[3]);
+		 AffineTransformfixe->Shear(1,2,coefficient[4]);
+		 AffineTransformfixe->Shear(2,1,coefficient[5]);
+
+		  AffineTransformfixe->Translate(vecteurtranslation_x,true);
+		 AffineTransformfixe->Translate(vecteurtranslation_y,true);
+		 AffineTransformfixe->Translate(vecteurtranslation_z,true);
+     
+        ImageType::PointType center;
+       
+		//Patient 2
+       // center[0] =98;
+        //center[1] =68;
+        //center[2] =98;
+
+		//Patient 5
+		center[0]=111;
+		center[1]=80;
+		center[2]=111;
+
+		cout<<"center of rotation"<<center<<endl;
+
+		AffineTransformfixe->SetCenterOfRotationComponent(center);
+
+
+       
+        ImageType::SizeType sizefixed=m_FixedImage->GetLargestPossibleRegion().GetSize();
+		//sizefixed[1]+=100;
+        
+        
+        ResamplerBinaryType::Pointer maskResampleraff = ResamplerBinaryType::New();
+        maskResampleraff->SetInput(m_mask);
+        maskResampleraff->SetOutputDirection(m_FixedImage->GetDirection());
+        maskResampleraff->SetOutputOrigin(m_FixedImage->GetOrigin());
+        maskResampleraff->SetOutputSpacing(m_FixedImage->GetSpacing());
+        maskResampleraff->SetSize(sizefixed);
+       // maskResampleraff->SetTransform(transformaff);
+		maskResampleraff->SetTransform(AffineTransformfixe);
+        
+        try {
+            maskResampleraff->Update();
+        } catch (itk::ExceptionObject &e) {
+            cerr<<"error while transforming mesh"<<endl;
+            cerr<<e<<endl;
+        }
+        
+        maskTsf = maskResampleraff->GetOutput();
+
+	}
     
     return maskTsf;
 }

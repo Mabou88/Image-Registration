@@ -9,14 +9,15 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <chrono>
 
 #include "gradient.h"
 #include "LC2_function.hpp"
 #include "Roi_crane.h"
 #include "AffineRegistration.h"
+#include "Similaritymeasure.h"
+#include "Filtre.h"
 
-#include "mitkITKImageImport.h"
-#include "mitkImageToItk.h"
 
 #include "itkImage.h"
 #include "itkImageFileReader.h"
@@ -47,7 +48,7 @@
 #include "itkMultiResolutionPyramidImageFilter.h"
 #include "itkBsplineTransform.h"
 #include "itkAdaptiveHistogramEqualizationImageFilter.h"
-
+#include "itkCenteredEuler3DTransform.h"
 #include <cmath>
 
 #include <dlib\optimization.h>
@@ -63,9 +64,10 @@ using namespace dlib;
 
 
 //images
-typedef itk::Image<double,3> ImageType;
+typedef itk::Image<short,3> ImageType;
 typedef itk::Image<unsigned char, 3> BinaryImageType;
 typedef itk::Image<double,2> Image2DType;
+typedef itk::Vector<int,3> VectorGeo;
 
 //IO
 typedef itk::ImageFileReader<ImageType> ReaderType;
@@ -82,15 +84,18 @@ typedef itk::LevenbergMarquardtOptimizer LMOptimizerType;
 typedef itk::LinearInterpolateImageFunction<ImageType,double> InterpolatorType;
 typedef itk::ImageRegistrationMethod<ImageType, ImageType> RegistrationType;
 typedef itk::Euler3DTransform<double> EulerTransformType;
+typedef itk::CenteredEuler3DTransform <double> EulerCenterTransformType;
 typedef itk::LC2ImageToImageMetric<ImageType, ImageType> LC2MetricType;
 typedef itk::TranslationTransform<double,3> TranslationType;
 typedef itk::AffineTransform<double,3> AffineTransformType;
 typedef itk::BSplineTransform<double,3,3> BSplineTransformType;
+typedef BSplineTransformType::ParametersType     BSParametersType;
 typedef itk::AdaptiveHistogramEqualizationImageFilter<ImageType> HistoEqualizerType;
-
+typedef itk::TranslationTransform<double,3> TranslationTransformType;
 
 //pour le mapping de l'image mobile registree ac tsf determinee par registration framework
 typedef itk::ResampleImageFilter<ImageType, ImageType> ResampleFilterType;
+typedef itk::ResampleImageFilter<MaskType, MaskType> ResamplerBinaryType;
 
 //pour la mise a l'echelle de la bande passante des intensites
 typedef itk::RescaleIntensityImageFilter<ImageType,ImageType> RescaleFilterType;
@@ -390,7 +395,7 @@ int main(int argc, const char * argv[]) {
     shrinkerMRI->SetInput(image_IRM);
     shrinkerMRI->SetShrinkFactor(0, 1); //changer à 1 ,(2 pour MRI avant)
     shrinkerMRI->SetShrinkFactor(1, 1);
-    shrinkerMRI->SetShrinkFactor(2, 1);
+	shrinkerMRI->SetShrinkFactor(2, 1);
     try {
         shrinkerMRI->Update();
     } catch (itk::ExceptionObject &e) {
@@ -444,20 +449,227 @@ int main(int argc, const char * argv[]) {
     minMaxIRM2->Compute();
 
     cout<<"rescaled intensity range IRM image : "<<"[ "<<minMaxIRM2->GetMinimum()<<","<<minMaxIRM2->GetMaximum()<<" ]"<<endl;
- //*************************************************************************	
-//Test
+ //*****************************************************
+	ImageType::Pointer mask_US = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io = itk::NiftiImageIO::New();
+    reader_m->SetImageIO(mask_io);
+    reader_m->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/02-05_t1w.nii");
+    try {
+        reader_m->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading US mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    mask_US = reader_m->GetOutput();
+
+
+	WriterType::Pointer   writer00 =  WriterType::New();
+		itk::NiftiImageIO::Pointer ioimagenifti00=itk::NiftiImageIO::New();
+
+		 string outputfile00="C:/Users/Marc-Antoine/Documents/Imagecode/output/US_avant.nii";
+		
+
+		 writer00->SetImageIO(ioimagenifti00);
+		writer00->SetFileName( outputfile00);
+		writer00->SetInput(image_US);
+		 writer00->Update();
+//*************************************************************************	
+//SimilarityMeasure
+//*************************************************************************
+		//Similaritymeasure similaritymeasure;
+		//similaritymeasure.computeoverlap();
+		//float dicecoefficient=similaritymeasure.getindex();
+		//cout<<"Similarity index (Dice): "<< float(dicecoefficient)<<endl;
+
+
+//*************************************************************************	
+//Filtre
+//*************************************************************************
+		// Filtre filtre(US_shrunk);
+		 //filtre.FFT_transform();
+
+		//Filtre filtrespatial(US_shrunk);
+		//filtrespatial.filtrepassehaut();
+		//filtrespatial.createkernel(3);
+		//filtrespatial.filtregaussian();
+		//filtrespatial.sauvegardeimage();
+		//US_shrunk=filtrespatial.getresult();
+
+
+
+
+//*************************************************************************	
+//Align image center
 //************************************************************************* 
 	
+	//trouve les centres
+	ImageType::SizeType size_irm=rescaled_IRM->GetLargestPossibleRegion().GetSize();
+	ImageType::SizeType size_us=US_shrunk->GetLargestPossibleRegion().GetSize();
+	ImageType::IndexType centre_irm;
+	centre_irm[0]=size_irm[0]/2;
+	centre_irm[1]=size_irm[1]/2;
+	centre_irm[2]=size_irm[2]/2;
+	ImageType::IndexType centre_us;
+	centre_us[0]=size_us[0]/2;
+	centre_us[1]=size_us[1]/2;
+	centre_us[2]=size_us[2]/2;
+
+	ImageType::PointType centre_spatial_irm;
+	rescaled_IRM->TransformIndexToPhysicalPoint(centre_irm,centre_spatial_irm);
+	ImageType::PointType centre_spatial_us;
+	US_shrunk->TransformIndexToPhysicalPoint(centre_us,centre_spatial_us);
+
+	cout<<"us centre"<<centre_spatial_us<<endl;
+	cout<<"irm centre"<<centre_spatial_irm<<endl;
+
+	
+
+	EulerTransformType::Pointer translation =  EulerTransformType::New();
+	EulerTransformType::ParametersType parametre(6);
+	
+	parametre[0]=0;
+	parametre[1]=0;
+	parametre[2]=0;
+	parametre[3] = centre_spatial_us[0]-centre_spatial_irm[0];
+	parametre[4] = centre_spatial_us[1]-centre_spatial_irm[1];
+	parametre[5] = centre_spatial_us[2]-centre_spatial_irm[2];
+	parametre[3]=parametre[3]*-1;
+	parametre[4]=parametre[4]*-1;
+	parametre[5]=parametre[5]*-1;
+	translation->SetParameters(parametre);
+	
+	cout<< "parametre"<<parametre<<endl;
+	
+  
+	//transformation
+	
+	
+	ResampleFilterType::Pointer resampleFilter = ResampleFilterType::New();
+	resampleFilter->SetTransform(translation);
+	resampleFilter->SetInput(rescaled_IRM);
+	ImageType::SizeType   size = rescaled_IRM->GetLargestPossibleRegion().GetSize();
+	resampleFilter->SetSize( size );
+	resampleFilter->SetOutputSpacing(rescaled_IRM->GetSpacing());
+	resampleFilter->SetOutputDirection(translation->GetInverseMatrix()*rescaled_IRM->GetDirection());
+	resampleFilter->SetOutputOrigin(translation->GetInverseTransform()->TransformPoint(rescaled_IRM->GetOrigin()));
+	resampleFilter->Update();
+	rescaled_IRM = resampleFilter->GetOutput();
+
+	if(useLiverMask){
+	ResamplerBinaryType::Pointer resampleFilter2 = ResamplerBinaryType::New();
+	resampleFilter2->SetTransform(translation);
+	resampleFilter2->SetInput(LiverMask);
+	ImageType::SizeType   sizemask = LiverMask->GetLargestPossibleRegion().GetSize();
+	resampleFilter2->SetSize( sizemask );
+	resampleFilter2->SetOutputSpacing(LiverMask->GetSpacing());
+	resampleFilter2->SetOutputDirection(translation->GetInverseMatrix()*LiverMask->GetDirection());
+	resampleFilter2->SetOutputOrigin(translation->GetInverseTransform()->TransformPoint(LiverMask->GetOrigin()));
+	resampleFilter2->Update();
+	LiverMask = resampleFilter2->GetOutput();
+	}
+	//ImageType::Pointer sizeImage = ImageType::New();
+    
 	
 
 
-    //*************************************************************************
+//*************************************************************************	
+//Rotation a US
+//************************************************************************* 
+	
+	EulerTransformType::Pointer rotation2 =  EulerTransformType::New();
+	EulerTransformType::ParametersType parametrerot2(6);
+	EulerTransformType::FixedParametersType rotationcenter2(3);
+	double angle90rad2=3.1416/2;
+	parametrerot2[0]=0; //sagital vert reste
+	parametrerot2[1]=angle90rad2; //coronal bleu reste
+	parametrerot2[2]=-angle90rad2;//axial (rouge) reste
+	parametrerot2[3] = 0;
+	parametrerot2[4] = 0;
+	parametrerot2[5] = 0;
+	rotationcenter2[0]=centre_spatial_us[0];
+	rotationcenter2[1]=centre_spatial_us[1];
+	rotationcenter2[2]=centre_spatial_us[2];
+	rotation2->SetFixedParameters(rotationcenter2);
+	rotation2->SetParameters(parametrerot2);
+	
+	
+
+	cout<<"centre rot"<<centre_spatial_us<<endl;
+	
+	
+	ResampleFilterType::Pointer resampler2 = ResampleFilterType::New();
+    resampler2->SetInput(US_shrunk);
+	resampler2->SetTransform(rotation2);
+
+	resampler2->SetSize(US_shrunk->GetLargestPossibleRegion().GetSize());
+    resampler2->SetOutputSpacing(US_shrunk->GetSpacing());
+   resampler2->SetOutputDirection(US_shrunk->GetDirection());
+   resampler2->SetOutputOrigin((US_shrunk->GetOrigin()));
+   resampler2->Update();
+
+   US_shrunk = resampler2->GetOutput();
+
+
+  
+
+	
+
+	WriterType::Pointer   writer0 =  WriterType::New();
+		itk::NiftiImageIO::Pointer ioimagenifti0=itk::NiftiImageIO::New();
+
+		 string outputfile="C:/Users/Marc-Antoine/Documents/Imagecode/output/US.nii";
+		
+
+		 writer0->SetImageIO(ioimagenifti0);
+		writer0->SetFileName( outputfile);
+		writer0->SetInput(US_shrunk);
+		 writer0->Update();
+
+		 WriterType::Pointer   writer1 =  WriterType::New();
+		itk::NiftiImageIO::Pointer ioimagenifti1=itk::NiftiImageIO::New();
+
+		 string outputfile2="C:/Users/Marc-Antoine/Documents/Imagecode/output/IRM.nii";
+		
+
+		 writer1->SetImageIO(ioimagenifti1);
+		writer1->SetFileName( outputfile2);
+		writer1->SetInput(rescaled_IRM);
+		 writer1->Update();
+
+		 cout<<"US et IRM initialise"<<endl;
+
+    
+		
+		 
+		 
+		 
+		 
+		 //*************************************************************************
   // Selectionne la region of interest du crane avec le gradient
   //*************************************************************************
 	
 	Roi_crane crane(US_shrunk);
 	
+	
+	
 	crane.setdim();
+	
+	
+	for (int z=60;z<180;z++){
+		//crane.setlimitexy(z);
+		//crane.limiteparcercle(z);
+		//crane.regionexterieur(z);
+	}
+	crane.regioninferieur(62);
+	crane.regionssuperieur();
+
+	
+	/*
 	crane.limiteinferieuravant();
 	crane.limiteinferieurarriere();
 	crane.limiteposterieur();
@@ -467,18 +679,297 @@ int main(int argc, const char * argv[]) {
 		crane.limitegauche(z);
 		
 	}
-	cout<<"bordure"<<endl;
-	crane.bordureexterieur();
-	cout<<"zone"<<endl;
-	crane.zonegrise();
 	
+	crane.bordureexterieur();
+	*/
+	//crane.zonegrise();
+	
+
+	//crane.patchertrou();
+	
+	//*************************************************************************
+  // technique avec le masque
+  //*************************************************************************
+	/*
+	ImageType::Pointer mask_US = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io = itk::NiftiImageIO::New();
+    reader_m->SetImageIO(mask_io);
+    reader_m->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/02-05_mask.nii");
+    try {
+        reader_m->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading US mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    mask_US = reader_m->GetOutput();
+	crane.maskcrane(mask_US);
+	
+	*/
 
 	crane.sauvegardeimage();
 	ImageType::Pointer US_final=crane.getcraneROI();
+	
 	US_shrunk=US_final;
 	cout<<"region selectionné"<<endl;
+	//***********************************************
+	//rotation vers l'avant
+	//*************************************************
+
+	 EulerTransformType::Pointer rotation3 =  EulerTransformType::New();
+	EulerTransformType::ParametersType parametrerot3(6);
+	EulerTransformType::FixedParametersType rotationcenter3(3);
+	double angle90rad3=3.1416/6;
+	parametrerot3[0]=-angle90rad3; //sagital vert reste
+	parametrerot3[1]=0; //coronal bleu reste
+	parametrerot3[2]=0;//axial (rouge) reste
+	parametrerot3[3] = 0;
+	parametrerot3[4] = 0;
+	parametrerot3[5] = 0;
+	rotationcenter3[0]=centre_spatial_us[0];
+	rotationcenter3[1]=centre_spatial_us[1];
+	rotationcenter3[2]=centre_spatial_us[2];
+	rotation3->SetFixedParameters(rotationcenter3);
+	rotation3->SetParameters(parametrerot3);
+	
+	
+
+	cout<<"centre rot"<<centre_spatial_us<<endl;
+	
+	
+	ResampleFilterType::Pointer resampler3 = ResampleFilterType::New();
+    resampler3->SetInput(US_shrunk);
+	resampler3->SetTransform(rotation3);
+
+	resampler3->SetSize(US_shrunk->GetLargestPossibleRegion().GetSize());
+    resampler3->SetOutputSpacing(US_shrunk->GetSpacing());
+   resampler3->SetOutputDirection(US_shrunk->GetDirection());
+   resampler3->SetOutputOrigin((US_shrunk->GetOrigin()));
+   resampler3->Update();
+
+   US_shrunk = resampler3->GetOutput();
+
+	Roi_crane crane2(rescaled_IRM);
+	/*
+	ImageType::Pointer mask_IRM = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m2 = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io2 = itk::NiftiImageIO::New();
+    reader_m2->SetImageIO(mask_io2);
+    reader_m2->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/02-05_mask.nii");
+    try {
+        reader_m2->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading IRM mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    mask_IRM = reader_m2->GetOutput();
+	*/
+	crane2.setdim();
+	crane2.maskcrane(LiverMask);
+	rescaled_IRM=crane2.getcraneROI();
+
+	/*
+	ImageType::Pointer Patient_IRM = ImageType::New();
+    
+        
+    ReaderType::Pointer reader_m2 = ReaderType::New();
+    itk::NiftiImageIO::Pointer mask_io2 = itk::NiftiImageIO::New();
+    reader_m2->SetImageIO(mask_io2);
+    reader_m2->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/input/P13_IRM_brain_bse.nii.gz");
+    try {
+        reader_m2->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading IRM mask"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    
+    Patient_IRM = reader_m2->GetOutput();
+	cout<<"Patient 2 IRM"<<endl;
+	Roi_crane volumepatient(Patient_IRM);
+	volumepatient.setdim();
+	volumepatient.calculvolumecrane();
+	//crane2.sauvegardeimage();
+	//rescaled_IRM=crane3.getcraneROI();
+	*/
+
 	cout<<"region selectionné"<<endl;
 	
+	
+	
+	//*************************************************************************
+  // Calcul de volume
+  //*************************************************************************
+	
+	Roi_crane volumeirm(rescaled_IRM);
+	volumeirm.setdim();
+	volumeirm.calculvolumecrane();
+	int largueurirm=volumeirm.getlargueurcerveau();
+	ImageType::IndexType centre_irm_init=volumeirm.getcentrecerveau();
+	
+	Roi_crane volumeus(US_shrunk);
+	volumeus.setdim();
+	volumeus.regioninferieur(65);
+	volumeus.calculvolumecrane();
+	int largueurus=volumeus.getlargueurcerveau();
+	ImageType::IndexType centre_us_init=volumeus.getcentrecerveau();
+	US_shrunk=volumeus.getcraneROI();
+
+
+	//Trouve le scale factor pour la mise à l'échelle
+	float scalefactor_irm=float(largueurirm)/float(largueurus);
+
+	cout<<"scalefactor"<<scalefactor_irm<<endl;
+
+	//Trouve la translation pour aligner les bords
+	ImageType::PointType pcentre;
+	US_shrunk->TransformIndexToPhysicalPoint(centre_us_init,pcentre);
+	ImageType::IndexType icentre;
+	rescaled_IRM->TransformPhysicalPointToIndex(pcentre,icentre);
+
+	VectorGeo vecteurtranslation;
+	vecteurtranslation[0]=centre_irm_init[0]-icentre[0]+1;
+	vecteurtranslation[1]=(centre_irm_init[1]-icentre[1])+9;
+	vecteurtranslation[2]=centre_irm_init[2]-icentre[2]-2;
+
+	cout<<"Vecteur translation: "<< vecteurtranslation<<endl;
+
+	//volumeirm.sauvegardeimage();
+	//volumeirm.maskcrane(mask_US);
+	
+	//volumeirm.calculvolumecrane();
+	
+	//*************************************************************************
+  // Transform de mise à l'échelle (scalable) sur IRM
+  //*************************************************************************
+	AffineTransformType::Pointer transformscalable = AffineTransformType::New();
+	AffineTransformType::OutputVectorType scalefactortransform;
+
+	scalefactor_irm=1.19;
+
+	scalefactortransform[0]=scalefactor_irm;
+	scalefactortransform[1]=scalefactor_irm;
+	scalefactortransform[2]=scalefactor_irm;
+
+	transformscalable->Scale(scalefactortransform,true);
+
+	//translate
+		 AffineTransformType::OutputVectorType vecteurtranslation_x_scale;
+		 AffineTransformType::OutputVectorType vecteurtranslation_y_scale;
+		 AffineTransformType::OutputVectorType vecteurtranslation_z_scale;
+		 vecteurtranslation_x_scale[0]=1;
+		 vecteurtranslation_x_scale[1]=0;
+		 vecteurtranslation_x_scale[2]=0;
+		 vecteurtranslation_y_scale[0]=0;
+		 vecteurtranslation_y_scale[1]=1;
+		 vecteurtranslation_y_scale[2]=0;
+		 vecteurtranslation_z_scale[0]=0;
+		 vecteurtranslation_z_scale[1]=0;
+		 vecteurtranslation_z_scale[2]=1;
+
+		 vecteurtranslation_x_scale=vecteurtranslation_x_scale*-19; //p5 ish
+		 vecteurtranslation_y_scale=vecteurtranslation_y_scale*-27;
+		 vecteurtranslation_z_scale=vecteurtranslation_z_scale*-30;
+
+		 transformscalable->Translate(vecteurtranslation_x_scale,true);
+		 transformscalable->Translate(vecteurtranslation_y_scale,true);
+		 transformscalable->Translate(vecteurtranslation_z_scale,true);
+
+		 //rotation pas le bon centre
+		 AffineTransformType::OutputVectorType axederotation_y_scale;
+		axederotation_y_scale[0]=1;
+		axederotation_y_scale[1]=0;
+		axederotation_y_scale[2]=0;
+
+		double anglerotation_y_scale=0.3;
+
+		//transformscalable->Rotate3D(axederotation_y_scale,anglerotation_y_scale,true);
+
+	ResamplerType::Pointer scaleimage = ResamplerType::New();
+	scaleimage->SetInput(rescaled_IRM);
+      scaleimage->SetSize(rescaled_IRM->GetLargestPossibleRegion().GetSize());
+        scaleimage->SetOutputSpacing(rescaled_IRM->GetSpacing());
+        scaleimage->SetOutputDirection(rescaled_IRM->GetDirection());
+        scaleimage->SetOutputOrigin(rescaled_IRM->GetOrigin());
+        scaleimage->SetTransform(transformscalable);
+        //resamplefilter->SetTransform(transform);
+
+		//InterpolatorNearestNeighbor::Pointer interpolator = InterpolatorNearestNeighbor::New();
+		//resamplefilteraff->SetInterpolator( interpolator );
+
+        
+        try {
+            scaleimage->Update();
+        } catch (itk::ExceptionObject &e) {
+            std::cerr<<"error while scaling irm image"<<std::endl;
+            std::cerr<<e<<std::endl;
+        }
+        
+       rescaled_IRM= scaleimage->GetOutput();
+/*******************
+  * US sauvegarde avant recalage
+ ******************/
+
+	   WriterType::Pointer   writerus =  WriterType::New();
+		itk::NiftiImageIO::Pointer ioimagenifti01=itk::NiftiImageIO::New();
+
+		 string outputfilefinal="C:/Users/Marc-Antoine/Documents/Imagecode/output/US_avantregist.nii";
+		
+
+		 writerus->SetImageIO(ioimagenifti01);
+		writerus->SetFileName( outputfilefinal);
+		writerus->SetInput(US_shrunk);
+		 writerus->Update();
+	/*******************
+     * DOWNSAMPLING US
+     ******************/
+    //RESOLUTION ADAPTATION US
+	
+    ShrinkFilterType::Pointer shrinkFilter2 = ShrinkFilterType::New();
+    shrinkFilter2->SetInput(US_shrunk);
+    
+    //recuperation des spacing des deux images pour savoir quel facteur utiliser
+    //ImageType::SpacingType spacingUS = image_US->GetSpacing();
+    //ImageType::SpacingType spacingIRM = image_IRM->GetSpacing();
+   
+	//calcul du spacing factor
+    //int shrinkX = int(spacingIRM[0]/spacingUS[0]);
+    //int shrinkY = int(spacingIRM[1]/spacingUS[1]);
+    //int shrinkZ = int(spacingIRM[2]/spacingUS[2]);
+
+	int shrinkX2 = 2;
+    int shrinkY2 = 2;
+    int shrinkZ2 = 2;
+    
+    cout<<"shrinking factors : "<<shrinkX2<<", "<<shrinkY2<<", "<<shrinkZ2<<endl;
+
+    //porc 6 : (3,3,2)/ porc 1 (5,4,3)
+    shrinkFilter2->SetShrinkFactor(0, shrinkX2);
+    shrinkFilter2->SetShrinkFactor(1, shrinkY2);
+    shrinkFilter2->SetShrinkFactor(2, shrinkZ2);
+    try {
+        shrinkFilter2->Update();
+    } catch (itk::ExceptionObject &e) {
+        cerr<<"error while downsampling US image"<<endl;
+        cerr<<e<<endl;
+        return EXIT_FAILURE;
+    }
+	
+	
+    
+   US_shrunk = shrinkFilter2->GetOutput();
+   
+
+
+
 	//*************************************************************************	
 
 //sauvegarde l'image modifier
@@ -487,7 +978,7 @@ int main(int argc, const char * argv[]) {
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/US_shrunk.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/US_shrunk.nii");
   writer->SetInput(US_shrunk);
   writer->Update();
 
@@ -495,9 +986,46 @@ int main(int argc, const char * argv[]) {
   itk::NiftiImageIO::Pointer ioimagenifti2=itk::NiftiImageIO::New();
 
   writer2->SetImageIO(ioimagenifti2);
-  writer2->SetFileName( "C:/im/rescaled_IRM.nii");
+  writer2->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/rescaled_IRM.nii");
   writer2->SetInput(rescaled_IRM);
   writer2->Update();
+
+
+  //*************************************************************************	
+
+//ouverture des images déjà recalés
+//*************************************************************************
+  /*
+  ReaderType::Pointer reader_us_reca = ReaderType::New();
+  
+    reader_us_reca->SetImageIO(ioimagenifti);
+    reader_us_reca->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/output/Affine_auto_centre/Patient 10/US_shrunk.nii");
+    try {
+        reader_m->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    	
+	
+	US_shrunk=reader_us_reca->GetOutput();
+
+	ReaderType::Pointer reader_irm_reca = ReaderType::New();
+  
+    reader_irm_reca->SetImageIO(ioimagenifti);
+    reader_irm_reca->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/output/Affine_auto_centre/Patient 10/IRM_regis.nii.gz");
+    try {
+        reader_irm_reca->Update();
+    } catch (itk::ExceptionObject &e) {
+        cout<<"Error while reading"<<endl;
+        cout<<e<<endl;
+        EXIT_FAILURE;
+    }
+    	
+	
+	rescaled_IRM=reader_irm_reca->GetOutput();
+	*/
 
     /*************************
      * RECALAGE
@@ -587,17 +1115,20 @@ int main(int argc, const char * argv[]) {
     
     //niter
     double nombreIteration = 200;
+
+	//euler
+	int type=1;
     
-    LC2_function LC2 = LC2_function(rescaled_IRM,US_shrunk,outputPath);//MRI_shrunk or rescaled
+    LC2_function LC2 = LC2_function(US_shrunk,rescaled_IRM,outputPath,type);//MRI_shrunk or rescaled
     //make sure that the mask is computed on US_Shrunk but that we use the rescaled image to compute LC2
     //LC2.setMovingImage(rescaled_US);
-    LC2.setMaxRot(0.3); //0.3 for best initialisation
-    LC2.setMaxTrans(10);//10
+    LC2.setMaxRot(0.15); //0.3 for best initialisation
+    LC2.setMaxTrans(5);//10
     LC2.setRadius(radius);
     
     if(useLiverMask) LC2.setLiverMask(LiverMask);
     
-   double best_score = find_max_bobyqa(LC2, initialParameters, m, x_lower, x_upper, LC2.getRadius(), precision, nombreIteration);
+   double best_score = find_min_bobyqa(LC2, initialParameters, m, x_lower, x_upper, LC2.getRadius(), precision, nombreIteration);
     //double best_score = find_min_bobyqa(LC2_function(rescaled_IRM, US_shrunk), initialParameters, m, x_lower, x_upper, radius, precision, nombreIteration);
     
     cout<<"best score 1ere etape : "<<best_score<<endl;
@@ -614,6 +1145,11 @@ int main(int argc, const char * argv[]) {
 //    cout<<"test best parameters 1ere etape: "<<Step1Parameters<<endl;
     
     
+//************************************************************
+//Euler 3D transform (Rigid)
+//**********************************************
+
+
     //enregistrement resultats
     EulerTransformType::ParametersType finalParameters(6);
     finalParameters[0] = initialParameters(0)*LC2.getMaxRot()/(LC2.getRadius());
@@ -633,13 +1169,15 @@ int main(int argc, const char * argv[]) {
     
     //ecritire des parametres dans un fichier txt
     
-    string outP =outputPath+"/parameters.txt";
+    string outP =outputPath+"parameters.txt";
     ofstream fichier(outP.c_str(),ios::out | ios::trunc );
     
     if(fichier)
     {
         fichier<<"Parameters for rigid transform : "<<endl;
         fichier<<finalTsf->GetParameters()<<endl;
+		fichier<<"6  initial Parameters for rigid transform : "<<endl;
+		fichier<<initialParameters<<endl;
         fichier<<" Score for this position : "<<endl;
         fichier<<best_score<<endl;
         fichier.close();
@@ -656,9 +1194,19 @@ int main(int argc, const char * argv[]) {
     ImageType::PointType origin2 = US_shrunk->GetOrigin();
     ImageType::SpacingType spacing2 = US_shrunk->GetSpacing();
     ImageType::PointType center2;
-    center2[0] = origin2[0]+spacing2[0]*sizeUS2[0]/2;
-    center2[1] = origin2[1]+spacing2[1]*sizeUS2[1]/2;
-    center2[2] = origin2[2]+spacing2[2]*sizeUS2[2]/2;
+    //center2[0] = origin2[0]+spacing2[0]*sizeUS2[0]/2;
+    //center2[1] = origin2[1]+spacing2[1]*sizeUS2[1]/2;
+    //center2[2] = origin2[2]+spacing2[2]*sizeUS2[2]/2;
+	
+	
+	//center2[0] = 0;
+    //center2[1] = 0;
+    //center2[2] = 0;
+
+	//Patient 5
+	center2[0]=111;
+	center2[1]=80;
+	center2[2]=111;
     
     
     EulerTransformType::ParametersType eulerFixedParameters2(3);
@@ -669,12 +1217,13 @@ int main(int argc, const char * argv[]) {
     finalTsf->SetFixedParameters(eulerFixedParameters2);
     
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
-    resampler->SetInput(image_US);
+	resampler->SetInput(rescaled_IRM);
     resampler->SetTransform(finalTsf);
     resampler->SetSize(image_US->GetLargestPossibleRegion().GetSize());
     resampler->SetOutputSpacing(image_US->GetSpacing());
     resampler->SetOutputDirection(finalTsf->GetInverseMatrix()*image_US->GetDirection());
     resampler->SetOutputOrigin(finalTsf->GetInverseTransform()->TransformPoint(image_US->GetOrigin()));
+	resampler->Update();
     //est ce que c'est une bonne idee de garder l'image full res alors qu'on fait le recalage base sur l'us downsampled ?
     
     cout<<"verification origine : "<<endl;
@@ -683,11 +1232,11 @@ int main(int argc, const char * argv[]) {
     
     ImageType::Pointer finalImage = ImageType::New();
     finalImage = resampler->GetOutput();
-    
+	rescaled_IRM=resampler->GetOutput();
     cout<<"writing final result"<<endl;
     
     WriterType::Pointer writer8 = WriterType::New();
-    string out8 =outputPath+"\finalregistreredUSBOBYQA.nii.gz";
+    string out8 =outputPath+"finalregistreredUSBOBYQA.nii.gz";
     writer8->SetImageIO(io);
     writer8->SetInput(finalImage);
     writer8->SetFileName(out8);
@@ -698,6 +1247,330 @@ int main(int argc, const char * argv[]) {
         cerr<<e<<endl;
         return EXIT_FAILURE;
     }
+	
+	
+
+	//**********************
+	//Affine transform
+	//****************************
+	
+	//nombre de parametres (ndimensions=3) (ndim+1)*(ndim)
+	
+	matrix<double> initialParameters_affineT (15,1);
+	//rotation
+    initialParameters_affineT(0) = 0;
+    initialParameters_affineT(1) = 0;
+    initialParameters_affineT(2) = 0;
+	//scale
+    initialParameters_affineT(3) = 0;
+    initialParameters_affineT(4) = 0;
+    initialParameters_affineT(5) = 0;
+	//shear
+	initialParameters_affineT(6) = 0;
+    initialParameters_affineT(7) = 0;
+    initialParameters_affineT(8) = 0;
+    initialParameters_affineT(9) = 0;
+    initialParameters_affineT(10) = 0;
+    initialParameters_affineT(11) = 0;
+	//trans
+    initialParameters_affineT(12) = 0;
+    initialParameters_affineT(13) = 0;
+    initialParameters_affineT(14) = 0;
+    
+    //cout<<"test params intial : "<<initialParameters<<endl;
+    
+    matrix<double> x_lower_affineT (15,1); //-0.5 rot, -10 trans
+   x_lower_affineT(0) = -1;
+    x_lower_affineT(1) = -1;
+    x_lower_affineT(2) = -1;
+    x_lower_affineT(3) = -1;
+    x_lower_affineT(4) = -1;
+    x_lower_affineT(5) = -1;
+	 x_lower_affineT(6) = -1;
+    x_lower_affineT(7) = -1;
+    x_lower_affineT(8) = -1;
+    x_lower_affineT(9) = -1;
+    x_lower_affineT(10) = -1;
+    x_lower_affineT(11) = -1;
+	x_lower_affineT(12) = -1;
+    x_lower_affineT(13) = -1;
+    x_lower_affineT(14) = -1;
+    
+    matrix<double> x_upper_affineT (15,1); //0.5 rot, 10 trans
+    x_upper_affineT(0) = 1;
+    x_upper_affineT(1) = 1;
+    x_upper_affineT(2) = 1;
+    x_upper_affineT(3) = 1;
+    x_upper_affineT(4) = 1;
+    x_upper_affineT(5) = 1;
+	x_upper_affineT(6) = 1;
+    x_upper_affineT(7) = 1;
+    x_upper_affineT(8) = 1;
+    x_upper_affineT(9) = 1;
+    x_upper_affineT(10) = 1;
+    x_upper_affineT(11) = 1;
+	x_upper_affineT(12) = 1;
+    x_upper_affineT(13) = 1;
+    x_upper_affineT(14) = 1;
+
+	double m_af = 31;
+    
+    //rho begin
+    double radius_af = 0.9; //0.9 //zero makes no sense !!!
+    
+    //rho end
+    double precision_af = 0.1; //0.01 0.001
+    
+    //niter
+    double nombreIteration_af = 200;
+    
+	cout<<"initialise LC2"<<endl;
+
+	//ImageType::PointType origine;
+	//origine[0]=0;
+	//origine[1]=0;
+	//origine[2]=0;
+	//rescaled_IRM->SetOrigin(origine);
+	//US_shrunk->SetOrigin(origine);
+	
+	int typeaf=2;
+
+    LC2_function LC2_af = LC2_function(US_shrunk,rescaled_IRM,outputPath,typeaf);//MRI_shrunk or rescaled
+    //make sure that the mask is computed on US_Shrunk but that we use the rescaled image to compute LC2
+    //LC2.setMovingImage(rescaled_US);
+	double ini_rot_af=0.08;
+	double ini_trans_af=3;
+	double ini_scale_af=1.07;
+	double ini_shear_af=0.15;
+
+    LC2_af.setMaxRot(ini_rot_af); //0.3 for best initialisation
+    LC2_af.setMaxTrans(ini_trans_af);//10
+	LC2_af.setMaxScale(ini_scale_af); //valeur arbitraire a verifier
+	//plus petit shear
+	LC2_af.setMaxShear(ini_shear_af);
+    LC2_af.setRadius(radius_af);
+    
+    if(useLiverMask) LC2_af.setLiverMask(LiverMask);
+
+	cout<<"calcul LC2"<<endl;
+
+	//Optimisation des paramètres avec Bobyqa
+	double best_score_af = find_min_bobyqa(LC2_af, initialParameters_affineT, m_af, x_lower_affineT, x_upper_affineT, LC2_af.getRadius(), precision_af, nombreIteration_af);
+    //double best_score = find_min_bobyqa(LC2_function(rescaled_IRM, US_shrunk), initialParameters, m, x_lower, x_upper, radius, precision, nombreIteration);
+    
+    cout<<"best score 1ere etape : "<<best_score_af<<endl;
+
+	
+	
+	//FINAL TSF
+    
+    AffineTransformType::Pointer finalAffTsf = AffineTransformType::New();
+    ///Rotation
+
+		//Définis l'axe de rotation avec un vecteur
+		AffineTransformType::OutputVectorType axederotation_x;
+		axederotation_x[0]=1;
+		axederotation_x[1]=0;
+		axederotation_x[2]=0;
+		AffineTransformType::OutputVectorType axederotation_y;
+		axederotation_y[0]=0;
+		axederotation_y[1]=1;
+		axederotation_y[2]=0;
+		AffineTransformType::OutputVectorType axederotation_z;
+		axederotation_z[0]=0;
+		axederotation_z[1]=0;
+		axederotation_z[2]=1;
+		
+		
+		///3er parametre sur les angles de rotation 1 pour chaque axe de rotation
+		//double anglerotation=0.3;
+		double anglerotation_x=initialParameters_affineT(0)*LC2_af.getMaxRot()/(LC2_af.getRadius());
+		double anglerotation_y=initialParameters_affineT(1)*LC2_af.getMaxRot()/(LC2_af.getRadius());
+		double anglerotation_z=initialParameters_affineT(2)*LC2_af.getMaxRot()/(LC2_af.getRadius());
+
+	
+	
+		std::cout<<"Affine tsf parameters : "<<finalAffTsf->GetParameters()<<std::endl;
+
+		finalAffTsf->Rotate3D(axederotation_x,anglerotation_x,true);
+		finalAffTsf->Rotate3D(axederotation_y,anglerotation_y,true);
+		finalAffTsf->Rotate3D(axederotation_z,anglerotation_z,true);
+
+       // std::cout<<"Affine tsf parameters : "<<transformaff->GetParameters()<<std::endl;
+
+		//essayer de scaler isotropique aussi!!!!!!
+
+	//Scale
+		AffineTransformType::OutputVectorType scalefactor;
+		scalefactor[0]=1+initialParameters_affineT(3)*(LC2_af.getMaxScale()-1)/(LC2_af.getRadius());
+		scalefactor[1]=1+initialParameters_affineT(3)*(LC2_af.getMaxScale()-1)/(LC2_af.getRadius());
+		scalefactor[2]=1+initialParameters_affineT(3)*(LC2_af.getMaxScale()-1)/(LC2_af.getRadius());
+
+		//finalAffTsf->Scale(scalefactor,true);
+
+		
+		
+		 std::cout<<"Affine tsf parameters : "<<finalAffTsf->GetParameters()<<std::endl;
+		 
+	//Shear
+		
+
+
+		 double coefficient[6];
+		coefficient[0]=initialParameters_affineT(6)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+		coefficient[1]=initialParameters_affineT(7)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+		coefficient[2]=initialParameters_affineT(8)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+		coefficient[3]=initialParameters_affineT(9)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+		coefficient[4]=initialParameters_affineT(10)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+		coefficient[5]=initialParameters_affineT(11)*LC2_af.getMaxShear()/(LC2_af.getRadius());
+
+		//a verifier peut besoin de 6 parametre pcq inverser 0 et 1
+		 finalAffTsf->Shear(0,1,coefficient[0]);
+		 finalAffTsf->Shear(1,0,coefficient[1]);
+		 finalAffTsf->Shear(2,0,coefficient[2]);
+		finalAffTsf->Shear(0,2,coefficient[3]);
+		finalAffTsf->Shear(1,2,coefficient[4]);
+		finalAffTsf->Shear(2,1,coefficient[5]);
+		 
+		
+
+		 std::cout<<"Affine tsf parameters : "<<finalAffTsf->GetParameters()<<std::endl;
+		 
+	//translate
+		 AffineTransformType::OutputVectorType vecteurtranslation_x;
+		 AffineTransformType::OutputVectorType vecteurtranslation_y;
+		 AffineTransformType::OutputVectorType vecteurtranslation_z;
+		 vecteurtranslation_x[0]=1;
+		 vecteurtranslation_x[1]=0;
+		 vecteurtranslation_x[2]=0;
+		 vecteurtranslation_y[0]=0;
+		 vecteurtranslation_y[1]=1;
+		 vecteurtranslation_y[2]=0;
+		 vecteurtranslation_z[0]=0;
+		 vecteurtranslation_z[1]=0;
+		 vecteurtranslation_z[2]=1;
+
+		 vecteurtranslation_x=vecteurtranslation_x*initialParameters_affineT(12)*LC2_af.getMaxTrans()/(LC2_af.getRadius());
+		 vecteurtranslation_y=vecteurtranslation_y*initialParameters_affineT(13)*LC2_af.getMaxTrans()/(LC2_af.getRadius());
+		 vecteurtranslation_z=vecteurtranslation_z*initialParameters_affineT(14)*LC2_af.getMaxTrans()/(LC2_af.getRadius());
+
+		 finalAffTsf->Translate(vecteurtranslation_x,true);
+		 finalAffTsf->Translate(vecteurtranslation_y,true);
+		 finalAffTsf->Translate(vecteurtranslation_z,true);
+
+
+		  //Affine transform avec centre pré déterminé
+
+		AffineTransformfixedcenter::Pointer AffineTransformfixefinal=AffineTransformfixedcenter::New();
+
+		AffineTransformfixefinal->Rotate3D(axederotation_x,anglerotation_x,true);
+		AffineTransformfixefinal->Rotate3D(axederotation_y,anglerotation_y,true);
+		AffineTransformfixefinal->Rotate3D(axederotation_z,anglerotation_z,true);
+
+		AffineTransformfixefinal->Scale(scalefactor,true);
+
+	
+		 AffineTransformfixefinal->Shear(0,1,coefficient[0]);
+		 AffineTransformfixefinal->Shear(1,0,coefficient[1]);
+		 AffineTransformfixefinal->Shear(2,0,coefficient[2]);
+		 AffineTransformfixefinal->Shear(0,2,coefficient[3]);
+		 AffineTransformfixefinal->Shear(1,2,coefficient[4]);
+		 AffineTransformfixefinal->Shear(2,1,coefficient[5]);
+
+		  AffineTransformfixefinal->Translate(vecteurtranslation_x,true);
+		 AffineTransformfixefinal->Translate(vecteurtranslation_y,true);
+		 AffineTransformfixefinal->Translate(vecteurtranslation_z,true);
+     
+        ImageType::PointType center_af;
+       
+		//Patient 2
+       // center[0] =98;
+        //center[1] =68;
+        //center[2] =98;
+
+		//Patient 5
+		center_af[0]=111;
+		center_af[1]=80;
+		center_af[2]=111;
+
+		cout<<"center of rotation"<<center_af<<endl;
+
+		AffineTransformfixefinal->SetCenterOfRotationComponent(center_af);
+    
+    cout<<"final parameters : "<<initialParameters_affineT<<endl;
+    
+    //ecritire des parametres dans un fichier txt
+    
+    string outP2 =outputPath+"parametersaffine.txt";
+    ofstream fichier2(outP2.c_str(),ios::out | ios::trunc );
+    
+    if(fichier2)
+    {
+        fichier2<<"Matrix parameters for Affine transform  : "<<endl;
+        fichier2<<finalAffTsf->GetParameters()<<endl;
+		fichier2<<"Transform optimize parameters for Affine transform  : "<<endl;
+        fichier2<<initialParameters_affineT<<endl;
+        fichier2<<" Score for this position : "<<endl;
+        fichier2<<best_score_af<<endl;
+		fichier2<<"Initialisation value: "<<endl;
+		fichier2<<"Rotation: "<<ini_rot_af<<"Translation: "<<ini_trans_af<<"Scale: "<<ini_scale_af<<"Shear: "<<ini_shear_af<<endl;
+        fichier2.close();
+    }
+    
+    else
+    {
+        cerr<<"Error in opening txt file for parameters"<<endl;
+    }
+    
+    cout<<"Writing final registered US image"<<endl;
+    
+    
+    
+    ResampleFilterType::Pointer resampler_af = ResampleFilterType::New();
+	resampler_af->SetInput(rescaled_IRM);
+	resampler_af->SetTransform(AffineTransformfixefinal);
+    //resampler->SetTransform(finalAffTsf);
+    //resampler->SetSize(image_US->GetLargestPossibleRegion().GetSize());
+    //resampler->SetOutputSpacing(image_US->GetSpacing());
+   // resampler->SetOutputDirection(finalAffTsf->GetInverseMatrix()*image_US->GetDirection());
+   // resampler->SetOutputOrigin(finalAffTsf->GetInverseTransform()->TransformPoint(image_US->GetOrigin()));
+
+	resampler_af->SetSize(image_US->GetLargestPossibleRegion().GetSize());
+    resampler_af->SetOutputSpacing(image_US->GetSpacing());
+    resampler_af->SetOutputDirection(image_US->GetDirection());
+    resampler_af->SetOutputOrigin(image_US->GetOrigin());
+    //est ce que c'est une bonne idee de garder l'image full res alors qu'on fait le recalage base sur l'us downsampled ?
+    try {
+            resampler_af->Update();
+        } catch (itk::ExceptionObject &e) {
+            cerr<<"error while transforming mesh"<<endl;
+            cerr<<e<<endl;
+    }
+
+    cout<<"verification origine : "<<endl;
+    cout<<"avant tsf : "<<image_IRM->GetOrigin()<<endl;
+    cout<<"apres : "<<finalAffTsf->GetInverseTransform()->TransformPoint(image_IRM->GetOrigin());
+	cout<<"apres IRM: "<<image_US->GetOrigin();
+    
+    ImageType::Pointer finalImage_af = ImageType::New();
+    finalImage_af = resampler_af->GetOutput();
+    
+    cout<<"writing final result"<<endl;
+    
+    WriterType::Pointer writer9 = WriterType::New();
+    string out9 =outputPath+"finalregistreredAffineUSBOBYQA.nii.gz";
+    writer9->SetImageIO(io);
+    writer9->SetInput(finalImage_af);
+    writer9->SetFileName(out9);
+    try {
+        writer9->Update();
+    } catch (itk::ExceptionObject &e) {
+        cerr<<"error whilte writing registered image"<<endl;
+        cerr<<e<<endl;
+        return EXIT_FAILURE;
+    }
+	
+	
 //    
 //    //target points evaluation
 //    ImageType::PointType target1;
@@ -980,10 +1853,42 @@ int main(int argc, const char * argv[]) {
      **********************/
     /*
     BSplineTransformType::Pointer Btransform = BSplineTransformType::New();
+    //space dimension est a 3
+	//spline order est a 3 (peut le changer les 2)
+    int SpaceDimension=3;
+	int SplineOrder=3;
+
+	unsigned int numberOfGridNodesInOneDimension = 7;
+	BSplineTransformType::PhysicalDimensionsType   fixedPhysicalDimensions;
+  BSplineTransformType::MeshSizeType             meshSize;
+  BSplineTransformType::OriginType               fixedOrigin;
+
+  for( unsigned int i=0; i< SpaceDimension; i++ )
+    {
+    fixedOrigin[i] = rescaled_IRM->GetOrigin()[i];
+    fixedPhysicalDimensions[i] = rescaled_IRM->GetSpacing()[i] * static_cast<double>(rescaled_IRM->GetLargestPossibleRegion().GetSize()[i] - 1 );
+    }
+  meshSize.Fill( numberOfGridNodesInOneDimension - SplineOrder );
+	
+	
+  Btransform->SetTransformDomainOrigin( fixedOrigin );
+  Btransform->SetTransformDomainPhysicalDimensions(
+    fixedPhysicalDimensions );
+  Btransform->SetTransformDomainMeshSize( meshSize );
+  Btransform->SetTransformDomainDirection(rescaled_IRM->GetDirection() );
+  
+  const unsigned int numberOfParameters = Btransform->GetNumberOfParameters();
+  cout<<"number of parametre B SPline"<<numberOfParameters<<endl;
+  BSParametersType parameters( numberOfParameters );
+  parameters.Fill( 0.0 );
+  */
+  
+  //definition de la region de deformation
     
-    //definition de la region de deformation
+
+
+
     
-    */
     
     
     
