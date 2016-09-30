@@ -26,7 +26,7 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
 
   typedef itk::QuaternionRigidTransformGradientDescentOptimizer  OptimizerType2;
   //metric
-   typedef itk::MeanSquaresImageToImageMetric< ImageType, ImageType >   MetricType;
+   typedef itk::MutualInformationImageToImageMetric< ImageType, ImageType >   MetricType;
    //interpolateur
     typedef itk:: LinearInterpolateImageFunction< ImageType,  double>    InterpolatorType;
 	//registrationmethod
@@ -49,20 +49,22 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   typedef itk::ImageFileWriter< ImageType >  WriterType;
  
   WriterType::Pointer      fixedWriter =  WriterType::New();
-  fixedWriter->SetFileName("fixed.nii");
-  fixedWriter->SetInput( itkimageirm);
+  fixedWriter->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/output/fixed.nii");
+  fixedWriter->SetInput( itkimageus);
   fixedWriter->Update();
  //verifier  les setinput
   WriterType::Pointer      movingWriter =  WriterType::New();
-  movingWriter->SetFileName("moving.nii");
-  movingWriter->SetInput(itkimageus);
+  movingWriter->SetFileName("C:/Users/Marc-Antoine/Documents/Imagecode/output/moving.nii");
+  movingWriter->SetInput(itkimageirm);
   movingWriter->Update();
   
   
  
   // Set the registration inputs
-  registration->SetFixedImage(itkimageirm);
-  registration->SetMovingImage(itkimageus);
+  registration->SetFixedImage(itkimageus);
+  registration->SetMovingImage(itkimageirm);
+
+  registration->SetFixedImageRegion(itkimageus->GetLargestPossibleRegion() );
   
   //creation d'une region pour appliquer la metric
   typedef itk::ImageRegion<3> RegionType;
@@ -73,29 +75,53 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   //itkimageirm->SetRequestedRegion(region);
   //RegionType roi;
   //roi=itkimageirm->GetRequestedRegion();
-  metric->SetFixedImageRegion(region);
+  //metric->SetFixedImageRegion(region);
   //registration->SetFixedImageRegion(region);
   //registration->SetFixedImageRegionDefined(true);
   // a verifier
   //registration->SetFixedImageRegion(itkimageirm->GetLargestPossibleRegion());
 
   //initialise le centre de la rotation pour la transformation
+  /*
   typedef itk::CenteredTransformInitializer< TransformType, ImageType,ImageType >  TransformInitializerType;
   TransformInitializerType::Pointer initializer = TransformInitializerType::New();
    initializer->SetTransform(   transform );
-  initializer->SetFixedImage(itkimageirm );
-  initializer->SetMovingImage(itkimageus);
+  initializer->SetFixedImage(itkimageus );
+  initializer->SetMovingImage(itkimageirm);
   initializer->MomentsOn();
   initializer->InitializeTransform();
+  */
+  //  Initialize the transform
+  typedef RegistrationType::ParametersType ParametersType;
+  ParametersType initialParameters( transform->GetNumberOfParameters() );
+ /*
+  // rotation matrix
+  initialParameters[0] = 1.0;  // R(0,0)
+  initialParameters[1] = 0.0;  // R(0,1)
+  initialParameters[2] = 0.0;  // R(1,0)
+  initialParameters[3] = 1.0;  // R(1,1)
+  initialParameters[4] = 1.0;  // R(0,0)
+  initialParameters[5] = 0.0;  // R(0,1)
+  initialParameters[6] = 0.0;  // R(1,0)
+  initialParameters[7] = 1.0;
+  initialParameters[8] = 0.0;
+ 
+  // translation vector
+  initialParameters[9] = 0.0;
+  initialParameters[10] = 0.0;
+   initialParameters[11] = 0.0;
+   */
+
+
 
   //  Now we pass the parameters of the current transform as the initial
   //  parameters to be used when the registration process starts.
-  registration->SetInitialTransformParameters( transform->GetParameters());
+  //registration->SetInitialTransformParameters( transform->GetParameters());
+   registration->SetInitialTransformParameters( initialParameters );
 
 
-
-
-
+  
+  /*
 	  //  Initialize the transform
   double translationScale = 1.0 / 1000.0;
   typedef OptimizerType::ScalesType       OptimizerScalesType;
@@ -113,7 +139,8 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   optimizerScales[10] =  translationScale;
   optimizerScales[11] =  translationScale;
   optimizer->SetScales( optimizerScales );
-
+  */
+  
   int nombre=transform->GetNumberOfParameters();
   cout<<"parametre"<<endl;
   cout<<nombre<<endl;
@@ -123,10 +150,19 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   //registration->SetInitialTransformParameters( initialParameters );
 
   optimizer->SetMaximumStepLength( 0.1 );
-  optimizer->SetMinimumStepLength( 0.001 );
+  optimizer->SetMinimumStepLength( 0.01 );
  
   // Set a stopping criterion
-  optimizer->SetNumberOfIterations(2);
+  optimizer->SetNumberOfIterations(200);
+
+  try
+  {
+  metric->Initialize();
+  }
+  catch(itk::ExceptionObject & err)
+  {
+	  std::cerr<<"OH MY GOD METRIC"<<std::endl;
+  }
 
   try
   {
@@ -180,10 +216,10 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   resampler->SetOutputOrigin(  fixedImage->GetOrigin() );
   resampler->SetOutputSpacing( fixedImage->GetSpacing() );
   resampler->SetOutputDirection( fixedImage->GetDirection() );
-  resampler->SetDefaultPixelValue( 100 );
+  resampler->SetDefaultPixelValue( 0 );
 
   //ecris le resultats dans un fichier results.nii
-   typedef  double  OutputPixelType;
+   typedef  short  OutputPixelType;
   typedef itk::Image< OutputPixelType,3> OutputImageType;
   typedef itk::CastImageFilter<ImageType, OutputImageType > CastFilterType;
   typedef itk::ImageFileWriter< OutputImageType >  WriterType;
@@ -193,7 +229,7 @@ void AffineRegistration(ImageType::Pointer itkimageirm ,ImageType::Pointer itkim
   itk::NiftiImageIO::Pointer ioimagenifti=itk::NiftiImageIO::New();
 
   writer->SetImageIO(ioimagenifti);
-  writer->SetFileName( "C:/im/results_roi5.nii");
+  writer->SetFileName( "C:/Users/Marc-Antoine/Documents/Imagecode/output/roi5.nii");
   caster->SetInput( resampler->GetOutput() );
   writer->SetInput( caster->GetOutput()   );
   writer->Update();
